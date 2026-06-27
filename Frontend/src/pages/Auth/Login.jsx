@@ -3,12 +3,13 @@ import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { Mail, Lock, LogIn, AlertCircle } from 'lucide-react';
 import Input from '@/components/common/Input.jsx';
 import Button from '@/components/common/Button.jsx';
-import api from '@/services/api.js';
+import { useAuth } from '../../context/AuthContext';
 
 const Login = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const isExpired = searchParams.get('expired') === 'true';
+  const { login } = useAuth();
 
   const [formData, setFormData] = useState({
     email: '',
@@ -51,31 +52,12 @@ const Login = () => {
     setIsLoading(true);
     setApiError('');
 
-    try {
-      // Attempt backend signin
-      const response = await api.post('/users/login', formData);
-      if (response && response.success) {
-        localStorage.setItem('token', response.data.token);
-        localStorage.setItem('user', JSON.stringify(response.data.user));
-        navigate('/');
-      }
-    } catch (err) {
-      console.warn('⚠️ Backend login failed. Falling back to local offline sandbox mode...', err.message);
-      
-      // Local sandbox fallback for Phase 0 UI previewing
-      if (formData.email && formData.password) {
-        const mockUser = {
-          username: formData.email.split('@')[0],
-          email: formData.email,
-          role: 'researcher',
-        };
-        localStorage.setItem('token', 'mock_sandbox_jwt_token_key');
-        localStorage.setItem('user', JSON.stringify(mockUser));
-        navigate('/');
-      } else {
-        setApiError(err.message || 'Authentication failed');
-      }
-    } finally {
+    const result = await login(formData.email, formData.password);
+    
+    if (result.success) {
+      navigate('/dashboard'); // Redirect directly to the researcher home dashboard
+    } else {
+      setApiError(result.error || 'Authentication failed. Please check your credentials.');
       setIsLoading(false);
     }
   };

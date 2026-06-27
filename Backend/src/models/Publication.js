@@ -1,65 +1,157 @@
 import mongoose from 'mongoose';
+import './PublicationAuthor.js';
+import './PublicationKeyword.js';
+import './PublicationResearchArea.js';
 
 const publicationSchema = new mongoose.Schema(
   {
+    user: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      required: [true, 'Publication must be created by a user'],
+      index: true,
+    },
     title: {
       type: String,
       required: [true, 'Publication must have a title'],
       trim: true,
-      unique: true,
+      unique: true, // Duplicate prevention on titles
+      index: true,
     },
     abstract: {
       type: String,
       required: [true, 'Publication must have an abstract'],
       trim: true,
     },
-    authors: [
-      {
-        user: {
-          type: mongoose.Schema.Types.ObjectId,
-          ref: 'User',
-        },
-        displayName: {
-          type: String,
-          required: [true, 'Author display name is required'],
-        },
-        institution: String,
-      },
-    ],
+    doi: {
+      type: String,
+      unique: true,
+      sparse: true, // Allow multiple nulls/undefineds
+      trim: true,
+      index: true,
+      match: [/^10.\d{4,9}\/[-._;()/:A-Z0-9]+$/i, 'Please provide a valid DOI (e.g. 10.1016/j.jbi.2026.104230)'],
+    },
+    publisher: {
+      type: String,
+      trim: true,
+      default: '',
+    },
     journal: {
       type: String,
       trim: true,
-    },
-    doi: {
-      type: String,
-      trim: true,
-      unique: true,
-      sparse: true, // Allow multiple null/undefined values
-    },
-    publicationDate: {
-      type: Date,
-      default: Date.now,
-    },
-    fileUrl: {
-      type: String,
       default: '',
     },
-    tags: [
-      {
-        type: String,
-        trim: true,
-      },
-    ],
+    conference: {
+      type: String,
+      trim: true,
+      default: '',
+    },
+    publicationYear: {
+      type: Number,
+      required: [true, 'Publication year is required'],
+      index: true,
+    },
+    publicationType: {
+      type: String,
+      enum: ['journal', 'conference', 'book', 'book-chapter', 'patent', 'thesis', 'preprint', 'other'],
+      default: 'journal',
+      index: true,
+    },
+    language: {
+      type: String,
+      trim: true,
+      default: 'English',
+    },
     citationCount: {
       type: Number,
       default: 0,
-      min: 0,
+      min: [0, 'Citation count cannot be negative'],
+      index: true,
+    },
+    pdfUrl: {
+      type: String,
+      trim: true,
+      default: '',
+    },
+    thumbnail: {
+      type: String,
+      trim: true,
+      default: '',
+    },
+    visibility: {
+      type: String,
+      enum: ['public', 'private', 'restricted'],
+      default: 'public',
+      index: true,
+    },
+    isDeleted: {
+      type: Boolean,
+      default: false,
+      index: true,
     },
   },
   {
     timestamps: true,
+    toJSON: { virtuals: true },
+    toObject: { virtuals: true },
   }
 );
+
+// Indexes
+// Compound index for user publication years (for rapid retrieval of author CV timelines)
+publicationSchema.index({ user: 1, publicationYear: -1 });
+// Text index for global search
+publicationSchema.index({ title: 'text', abstract: 'text' });
+
+// Virtual populates
+publicationSchema.virtual('authors', {
+  ref: 'PublicationAuthor',
+  foreignField: 'publication',
+  localField: '_id',
+});
+
+publicationSchema.virtual('keywords', {
+  ref: 'PublicationKeyword',
+  foreignField: 'publication',
+  localField: '_id',
+});
+
+publicationSchema.virtual('researchAreas', {
+  ref: 'PublicationResearchArea',
+  foreignField: 'publication',
+  localField: '_id',
+});
+
+// Soft delete query middleware
+publicationSchema.pre(/^find/, function (next) {
+  this.find({ isDeleted: { $ne: true } });
+  next();
+});
+
+// Helper function to trigger metrics recalculation for all registered authors
+const triggerAuthorsMetricsUpdate = async function (pubId) {
+  try {
+    const PublicationAuthor = mongoose.model('PublicationAuthor');
+    const Profile = mongoose.model('Profile');
+
+    const authors = await PublicationAuthor.find({ publication: pubId, user: { $exists: true, $ne: null } }).select('user');
+    for (const author of authors) {
+      await Profile.recalculateMetrics(author.user);
+    }
+  } catch (err) {
+    console.error(`Failed to update author metrics for publication ${pubId}: ${err.message}`);
+  }
+};
+
+// Post-save hook to update author profiles when publications/citations change
+publicationSchema.post('save', async function (doc) {
+  await triggerAuthorsMetricsUpdate(doc._id);
+});
+
+// Post-remove/delete hook
+publicationSchema.post('remove', async function (doc) {
+  await triggerAuthorsMetricsUpdate(doc._id);
+});
 
 const Publication = mongoose.model('Publication', publicationSchema);
 export default Publication;

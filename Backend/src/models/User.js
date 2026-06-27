@@ -3,13 +3,16 @@ import bcrypt from 'bcryptjs';
 
 const userSchema = new mongoose.Schema(
   {
+    fullName: {
+      type: String,
+      required: [true, 'Please provide your full name'],
+      trim: true,
+    },
     username: {
       type: String,
-      required: [true, 'Please provide a username'],
-      unique: true,
       trim: true,
-      minlength: [3, 'Username must be at least 3 characters'],
-      maxlength: [30, 'Username cannot exceed 30 characters'],
+      unique: true,
+      sparse: true, // Allow null/undefined for users who register via Google
     },
     email: {
       type: String,
@@ -18,37 +21,56 @@ const userSchema = new mongoose.Schema(
       lowercase: true,
       trim: true,
       match: [/^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,3})+$/, 'Please provide a valid email address'],
+      index: true,
     },
     password: {
       type: String,
       required: [true, 'Please provide a password'],
       minlength: [8, 'Password must be at least 8 characters'],
-      select: false, // Do not return password by default in queries
+      select: false,
     },
     role: {
       type: String,
       enum: ['researcher', 'admin', 'reviewer', 'sponsor'],
       default: 'researcher',
     },
-    isVerified: {
+    status: {
+      type: String,
+      enum: ['active', 'blocked', 'deleted'],
+      default: 'active',
+      index: true,
+    },
+    googleId: {
+      type: String,
+      unique: true,
+      sparse: true,
+    },
+    emailVerified: {
       type: Boolean,
       default: false,
     },
+    verificationToken: String,
+    resetPasswordToken: String,
+    resetPasswordExpire: Date,
+    lastLogin: Date,
+    isDeleted: {
+      type: Boolean,
+      default: false,
+      index: true,
+    },
     passwordChangedAt: Date,
-    passwordResetToken: String,
-    passwordResetExpires: Date,
   },
   {
     timestamps: true,
   }
 );
 
+// Indexes
+userSchema.index({ email: 1, isDeleted: 1 });
+
 // Hash password before saving
 userSchema.pre('save', async function (next) {
-  // Only run this function if password was actually modified
   if (!this.isModified('password')) return next();
-
-  // Hash the password with cost of 12
   this.password = await bcrypt.hash(this.password, 12);
   next();
 });
@@ -56,8 +78,13 @@ userSchema.pre('save', async function (next) {
 // Update passwordChangedAt property before saving
 userSchema.pre('save', function (next) {
   if (!this.isModified('password') || this.isNew) return next();
+  this.passwordChangedAt = Date.now() - 1000;
+  next();
+});
 
-  this.passwordChangedAt = Date.now() - 1000; // Subtract 1s so token is created after change
+// Soft delete query middleware
+userSchema.pre(/^find/, function (next) {
+  this.find({ isDeleted: { $ne: true } });
   next();
 });
 
