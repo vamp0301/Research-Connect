@@ -3,6 +3,7 @@ import healthRouter from './health.routes.js';
 import authRouter from './auth.routes.js';
 import profileRouter from './profile.routes.js';
 import feedRouter from './feed.routes.js';
+import publicationRouter from './publication.routes.js';
 
 const router = express.Router();
 
@@ -11,5 +12,6 @@ router.use('/health', healthRouter);
 router.use('/auth', authRouter);
 router.use('/profile', profileRouter);
 router.use('/feed', feedRouter);
+router.use('/publications', publicationRouter);
 
 export default router;

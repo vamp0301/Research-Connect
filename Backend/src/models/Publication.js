@@ -41,6 +41,14 @@ const publicationSchema = new mongoose.Schema(
       trim: true,
       default: '',
     },
+    publicationDate: {
+      type: Date,
+      default: Date.now,
+    },
+    fileUrl: {
+      type: String,
+      default: '',
+    },
     conference: {
       type: String,
       trim: true,
