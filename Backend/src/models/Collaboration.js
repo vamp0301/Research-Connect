@@ -66,6 +66,7 @@ const collaborationSchema = new mongoose.Schema(
   },
   {
     timestamps: true,
+    collection: 'collaborations',
   }
 );
 

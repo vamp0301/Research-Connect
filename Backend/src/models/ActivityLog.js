@@ -28,6 +28,7 @@ const activityLogSchema = new mongoose.Schema(
   },
   {
     timestamps: { createdAt: true, updatedAt: false }, // Only need record time
+    collection: 'activityLogs',
   }
 );
 

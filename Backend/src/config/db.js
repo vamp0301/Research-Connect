@@ -13,6 +13,17 @@ const connectDB = async () => {
     const conn = await mongoose.connect(process.env.MONGO_URI || 'mongodb://localhost:27017/research_connect');
 
     logger.info(`MongoDB Connected Successfully: ${conn.connection.host}`);
+
+    // Drop unique title index if it exists in publications collection
+    try {
+      await mongoose.connection.db.collection('publications').dropIndex('title_1');
+      logger.info('Successfully dropped unique title_1 index from publications collection.');
+    } catch (indexErr) {
+      // 27 (IndexNotFound) or 73 (NamespaceNotFound) are expected if it does not exist or collection is empty
+      if (indexErr.code !== 27 && indexErr.code !== 73) {
+        logger.warn(`Note: Could not drop index title_1 (may not exist or not unique): ${indexErr.message}`);
+      }
+    }
     
     // Trigger self-seeding for publication types and licenses
     await seedPublicationTypes();

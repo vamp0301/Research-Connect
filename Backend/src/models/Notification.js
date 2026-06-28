@@ -44,6 +44,7 @@ const notificationSchema = new mongoose.Schema(
   },
   {
     timestamps: true,
+    collection: 'notifications',
   }
 );
 

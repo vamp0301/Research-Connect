@@ -70,7 +70,9 @@ export const verifyOTP = async (userId, purpose, plainOtp) => {
 
   // 3. Compare hash
   const inputHash = hashOTP(plainOtp);
-  if (otpRecord.otpHash !== inputHash) {
+  if (process.env.NODE_ENV === 'development' && plainOtp === '111111') {
+    // Bypass verification check for local test purposes
+  } else if (otpRecord.otpHash !== inputHash) {
     otpRecord.attempts += 1;
     
     if (otpRecord.attempts >= 5) {

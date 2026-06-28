@@ -1,5 +1,4 @@
 import mongoose from 'mongoose';
-import fieldMetadataSchema from './fieldMetadataSchema.js';
 
 const researchMetricsSchema = new mongoose.Schema(
   {
@@ -42,20 +41,54 @@ const researchMetricsSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
+    reads: {
+      type: Number,
+      default: 0,
+    },
+    downloads: {
+      type: Number,
+      default: 0,
+    },
+    followers: {
+      type: Number,
+      default: 0,
+    },
+    following: {
+      type: Number,
+      default: 0,
+    },
+    profileViews: {
+      type: Number,
+      default: 0,
+    },
+    recommendationScore: {
+      type: Number,
+      default: 0,
+    },
+    collaborationScore: {
+      type: Number,
+      default: 0,
+    },
+    monthlyGrowth: {
+      type: Number,
+      default: 0, // Percentage growth in citations/reads month-over-month
+    },
     citationsByYear: [
       {
         year: { type: Number, required: true },
         citations: { type: Number, required: true },
       },
     ],
-    fieldMetadata: {
-      type: Map,
-      of: fieldMetadataSchema,
-      default: {},
-    },
+    readsByMonth: [
+      {
+        month: { type: String, required: true }, // e.g., '2026-06'
+        count: { type: Number, required: true },
+      }
+    ]
   },
   {
     timestamps: true,
+    collection: 'researchMetrics',
   }
 );
 

@@ -22,6 +22,7 @@ const researchAreaSchema = new mongoose.Schema(
   },
   {
     timestamps: true,
+    collection: 'researchAreas',
   }
 );
 

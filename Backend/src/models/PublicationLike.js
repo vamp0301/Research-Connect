@@ -1,6 +1,6 @@
 import mongoose from 'mongoose';
 
-const publicationBookmarkSchema = new mongoose.Schema(
+const publicationLikeSchema = new mongoose.Schema(
   {
     user: {
       type: mongoose.Schema.Types.ObjectId,
@@ -20,8 +20,8 @@ const publicationBookmarkSchema = new mongoose.Schema(
   }
 );
 
-// Compound index to ensure a user can only bookmark a publication once
-publicationBookmarkSchema.index({ user: 1, publication: 1 }, { unique: true });
+// Compound index to ensure a user can only like a publication once
+publicationLikeSchema.index({ user: 1, publication: 1 }, { unique: true });
 
-const PublicationBookmark = mongoose.model('PublicationBookmark', publicationBookmarkSchema);
-export default PublicationBookmark;
+const PublicationLike = mongoose.model('PublicationLike', publicationLikeSchema);
+export default PublicationLike;

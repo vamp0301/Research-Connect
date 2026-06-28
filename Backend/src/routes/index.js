@@ -17,6 +17,8 @@ import projectRouter from './project.routes.js';
 import uploadRouter from './upload.routes.js';
 import discoveryRouter from './discovery.routes.js';
 import notificationRouter from './notification.routes.js';
+import scholarRouter from './scholar.routes.js';
+import metricsRouter from './metrics.routes.js';
 
 const router = express.Router();
 
@@ -39,6 +41,8 @@ router.use('/projects', projectRouter);
 router.use('/upload', uploadRouter);
 router.use('/discovery', discoveryRouter);
 router.use('/notifications', notificationRouter);
+router.use('/scholar', scholarRouter);
+router.use('/research-metrics', metricsRouter);
 router.use('/', followRouter);
 
 export default router;

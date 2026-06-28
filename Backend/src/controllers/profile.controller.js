@@ -1,61 +1,42 @@
-import Profile from '../models/Profile.js';
-import AcademicProfile from '../models/AcademicProfile.js';
-import Publication from '../models/Publication.js';
+import * as profileService from '../services/profile.service.js';
 import * as scholarService from '../services/scholar.service.js';
-import { validationResult } from 'express-validator';
-import AppError from '../utils/AppError.js';
+import * as uploadService from '../services/upload.service.js';
+import * as followService from '../services/follow.service.js';
+import ManualProfile from '../models/ManualProfile.js';
+import GoogleScholarProfile from '../models/GoogleScholarProfile.js';
+import ScholarPublication from '../models/ScholarPublication.js';
+import ResearchMetrics from '../models/ResearchMetrics.js';
+import SyncLog from '../models/SyncLog.js';
 import Education from '../models/Education.js';
 import Experience from '../models/Experience.js';
-import AcademicIdentity from '../models/AcademicIdentity.js';
-import ProfileHistory from '../models/ProfileHistory.js';
-import ResearchMetrics from '../models/ResearchMetrics.js';
-import ExternalAccount from '../models/ExternalAccount.js';
-import Keyword from '../models/Keyword.js';
-import UserKeyword from '../models/UserKeyword.js';
-import ResearchArea from '../models/ResearchArea.js';
-import UserResearchArea from '../models/UserResearchArea.js';
-import PublicationAuthor from '../models/PublicationAuthor.js';
-import PublicationHistory from '../models/PublicationHistory.js';
-import ResearchCollaborator from '../models/ResearchCollaborator.js';
-import { updateFieldWithMetadata } from '../utils/sourceTracker.js';
-import File from '../models/File.js';
-import { uploadFileToCloudinary, deleteFileFromCloudinary } from '../services/upload.service.js';
+import Award from '../models/Award.js';
+import Certification from '../models/Certification.js';
+import ResearchIdentity from '../models/ResearchIdentity.js';
+import AcademicProfile from '../models/AcademicProfile.js';
+import ProfileView from '../models/ProfileView.js';
+import User from '../models/User.js';
+import AppError from '../utils/AppError.js';
 
 /**
- * Get current user profile and metrics
+ * Get logged-in user's profile, education, experience, and metrics
  */
 export const getMyProfile = async (req, res, next) => {
   try {
-    const profile = await Profile.findOne({ user: req.user._id })
-      .populate('user', 'fullName email role status emailVerified isVerified isProfileComplete')
-      .populate('academicProfile')
-      .populate('researchMetrics')
-      .populate('educationList')
-      .populate('experienceList')
-      .populate({
-        path: 'researchAreas',
-        populate: { path: 'researchArea', select: 'areaName slug' }
-      })
-      .populate({
-        path: 'keywords',
-        populate: { path: 'keyword', select: 'keyword slug' }
-      });
-
-    if (!profile) {
-      return next(new AppError('Profile not found for this user.', 404));
+    const userId = req.user._id;
+    const profileDetails = await profileService.getFullProfileDetails(userId);
+    
+    // Fetch research identities
+    let identities = await ResearchIdentity.findOne({ user: userId });
+    if (!identities) {
+      identities = await ResearchIdentity.create({ user: userId });
     }
-
-    // Query and populate publications created/linked to this user, including their co-authors
-    const publications = await Publication.find({ user: req.user._id })
-      .populate({
-        path: 'authors',
-        options: { sort: { authorOrder: 1 } } // Sort co-authors by order of appearance
-      });
 
     res.status(200).json({
       status: 'success',
-      profile,
-      publications,
+      data: {
+        ...profileDetails,
+        identities,
+      },
     });
   } catch (error) {
     next(error);
@@ -63,85 +44,29 @@ export const getMyProfile = async (req, res, next) => {
 };
 
 /**
- * Get another researcher's profile by user ID with relationship states
+ * Get public profile of another researcher
  */
 export const getProfileByUserId = async (req, res, next) => {
   try {
     const targetUserId = req.params.id;
-    const currentUserId = req.user.id || req.user._id;
+    const profileDetails = await profileService.getFullProfileDetails(targetUserId);
 
-    const profile = await Profile.findOne({ user: targetUserId })
-      .populate('user', 'fullName email role status emailVerified isVerified isProfileComplete')
-      .populate('academicProfile')
-      .populate('researchMetrics')
-      .populate('educationList')
-      .populate('experienceList')
-      .populate({
-        path: 'researchAreas',
-        populate: { path: 'researchArea', select: 'areaName slug' }
-      })
-      .populate({
-        path: 'keywords',
-        populate: { path: 'keyword', select: 'keyword slug' }
-      });
+    let identities = await ResearchIdentity.findOne({ user: targetUserId });
 
-    if (!profile) {
-      return next(new AppError('Profile not found for this user.', 404));
-    }
-
-    const publications = await Publication.find({ user: targetUserId })
-      .populate({
-        path: 'authors',
-        options: { sort: { authorOrder: 1 } }
-      });
-
-    // 1. Fetch Follow status
-    const Follower = mongoose.model('Follower');
-    const isFollowing = await Follower.findOne({ follower: currentUserId, following: targetUserId });
-
-    // 2. Fetch Connection status
-    const ResearcherConnection = mongoose.model('ResearcherConnection');
-    const connection = await ResearcherConnection.findOne({
-      $or: [
-        { requester: currentUserId, receiver: targetUserId },
-        { requester: targetUserId, receiver: currentUserId },
-      ],
+    // Check if the requesting user follows this target researcher
+    const Follow = (await import('../models/Follow.js')).default;
+    const followRecord = await Follow.findOne({
+      followerId: req.user._id,
+      followingId: targetUserId
     });
-
-    let connectionState = 'Not Connected';
-    let connectionId = null;
-    if (connection) {
-      connectionId = connection._id;
-      if (connection.status === 'Connected') {
-        connectionState = 'Connected';
-      } else if (connection.status === 'Pending') {
-        connectionState = connection.requester.toString() === currentUserId.toString() ? 'Pending Sent' : 'Pending Received';
-      }
-    }
-
-    // 3. Fetch Blocked status
-    const BlockedUser = mongoose.model('BlockedUser');
-    const isBlocked = await BlockedUser.findOne({ blocker: currentUserId, blocked: targetUserId });
-
-    // 4. Fetch Collaboration Status
-    const CollaborationStatus = mongoose.model('CollaborationStatus');
-    const colStatusRecord = await CollaborationStatus.findOne({ user: targetUserId });
-
-    // 5. Followers / Following counts
-    const followersCount = await Follower.countDocuments({ following: targetUserId });
-    const followingCount = await Follower.countDocuments({ follower: targetUserId });
 
     res.status(200).json({
       status: 'success',
-      profile,
-      publications,
-      isFollowing: !!isFollowing,
-      connectionState,
-      connectionId,
-      isBlocked: !!isBlocked,
-      collaborationStatus: colStatusRecord?.status || 'Open for Collaboration',
-      followersCount,
-      followingCount,
+      data: {
+        ...profileDetails,
+        identities,
+        isFollowing: !!followRecord
+      },
     });
   } catch (error) {
     next(error);
@@ -149,102 +74,59 @@ export const getProfileByUserId = async (req, res, next) => {
 };
 
 /**
- * Update current user profile fields
+ * Update researcher's basic profile details (manual overrides)
  */
 export const updateProfile = async (req, res, next) => {
   try {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return next(new AppError(errors.array()[0].msg, 400));
+    const userId = req.user._id;
+    const updateFields = req.body;
+
+    let manual = await ManualProfile.findOne({ user: userId });
+    if (!manual) {
+      manual = new ManualProfile({ user: userId });
     }
 
-    const {
-      displayName,
-      headline,
-      bio,
-      designation,
-      department,
-      institution,
-      country,
-      state,
-      city,
-      highestQualification,
-      experience,
-      phone,
-      website,
-      gender,
-      languages,
-      employmentStatus,
-      profileVisibility,
-      socialLinks,
-      dateOfBirth
-    } = req.body;
+    // Assign fields
+    const allowedFields = [
+      'bio', 'displayName', 'headline', 'designation',
+      'department', 'institution', 'country', 'city', 'phone', 'website'
+    ];
 
-    const profile = await Profile.findOneAndUpdate(
-      { user: req.user._id },
-      {
-        displayName,
-        headline,
-        bio,
-        designation,
-        department,
-        institution,
-        country,
-        state,
-        city,
-        highestQualification,
-        experience,
-        phone,
-        website,
-        gender,
-        languages,
-        employmentStatus,
-        profileVisibility,
-        socialLinks,
-        dateOfBirth
-      },
-      { new: true, runValidators: true }
-    );
-
-    if (!profile) {
-      return next(new AppError('Profile not found.', 404));
-    }
-
-    const User = (await import('../models/User.js')).default;
-
-    if (req.body.isWizardSubmit) {
-      await User.findByIdAndUpdate(req.user._id, { isProfileComplete: true });
-    }
-
-    if (displayName) {
-      await User.findByIdAndUpdate(req.user._id, { fullName: displayName });
-    }
-
-    // Save snapshot to history (limit history to 10 versions to optimize space)
-    try {
-      const latestHistory = await ProfileHistory.findOne({ user: req.user._id }).sort({ version: -1 });
-      const newVersion = (latestHistory?.version || 0) + 1;
-      
-      // Delete old history items if they exceed 10
-      if (newVersion > 10) {
-        const excessVersionLimit = newVersion - 10;
-        await ProfileHistory.deleteMany({ user: req.user._id, version: { $lte: excessVersionLimit } });
+    allowedFields.forEach(field => {
+      if (updateFields[field] !== undefined) {
+        manual[field] = updateFields[field];
       }
+    });
 
-      await ProfileHistory.create({
-        user: req.user._id,
-        version: newVersion,
-        changeSummary: req.body.changeSummary || 'Profile updated manually',
-        snapshot: profile.toObject(),
-        changedBy: req.user._id
-      });
-    } catch (err) {
-      console.error('Failed to save profile history snapshot:', err.message);
+    // Handle social links map
+    if (updateFields.socialLinks) {
+      manual.socialLinks = {
+        ...manual.socialLinks,
+        ...updateFields.socialLinks,
+      };
+
+      // Also sync to ResearchIdentity if socialLinks are updated
+      await ResearchIdentity.findOneAndUpdate(
+        { user: userId },
+        {
+          linkedin: updateFields.socialLinks.linkedin,
+          orcid: updateFields.socialLinks.orcid,
+          researchGate: updateFields.socialLinks.researchgate,
+          github: updateFields.socialLinks.github,
+        },
+        { upsert: true }
+      );
     }
 
+    await manual.save();
+
+    // Recompile merged profile
+    const merged = await profileService.compileAndSaveMergedProfile(userId);
+
     res.status(200).json({
       status: 'success',
-      profile,
+      message: 'Profile updated successfully',
+      data: merged,
     });
   } catch (error) {
     next(error);
@@ -252,143 +134,44 @@ export const updateProfile = async (req, res, next) => {
 };
 
 /**
- * Preview Google Scholar details before importing
- * GET /api/v1/profile/google-scholar/preview
- */
-export const previewGoogleScholar = async (req, res, next) => {
-  try {
-    const { input } = req.query;
-
-    if (!input) {
-      return next(new AppError('Please provide a Scholar URL, Author ID, or Name.', 400));
-    }
-
-    const result = await scholarService.getScholarImportPreview(input);
-
-    res.status(200).json({
-      status: 'success',
-      data: result,
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-
-/**
- * Handle Google Scholar Profile Import (and selective sync)
- * POST /api/v1/profile/google-scholar/import
- */
-export const importGoogleScholar = async (req, res, next) => {
-  try {
-    const { authorId, selectedPubTitles } = req.body;
-
-    if (!authorId) {
-      return next(new AppError('Please provide a Google Scholar author ID.', 400));
-    }
-
-    const result = await scholarService.importGoogleScholarProfile(req.user._id, authorId, selectedPubTitles);
-
-    res.status(200).json({
-      status: 'success',
-      message: 'Google Scholar profile and publications imported successfully.',
-      ...result,
-    });
-  } catch (error) {
-    console.error('🔥 importGoogleScholar Error:', error);
-    res.status(500).json({
-      status: 'error',
-      message: `Failed to complete importing Scholar profile: ${error.message}`,
-      stack: error.stack,
-      details: error
-    });
-  }
-};
-
-
-
-/**
- * Unlink Google Scholar profile from account
- * DELETE /api/v1/profile/google-scholar/unlink
- */
-export const unlinkGoogleScholar = async (req, res, next) => {
-  try {
-    await scholarService.unlinkGoogleScholarProfile(req.user._id);
-
-    res.status(200).json({
-      status: 'success',
-      message: 'Google Scholar account unlinked successfully.',
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-
-/**
- * Recount/Refresh publication statistics
- * POST /api/v1/profile/google-scholar/refresh
- */
-export const refreshGoogleScholar = async (req, res, next) => {
-  try {
-    await Profile.recalculateMetrics(req.user._id);
-
-    res.status(200).json({
-      status: 'success',
-      message: 'Researcher metrics recounted successfully.',
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-
-/**
- * Upload Profile Photo / Cover Photo
+ * Upload profile photo
  */
 export const uploadPhoto = async (req, res, next) => {
   try {
-    const isCover = req.path.includes('cover');
     if (!req.file) {
-      return next(new AppError('No photo file uploaded.', 400));
+      return next(new AppError('No file uploaded', 400));
     }
 
-    const profile = await Profile.findOne({ user: req.user._id });
-    if (!profile) {
-      return next(new AppError('Profile not found for this user.', 404));
-    }
+    const userId = req.user._id;
+    const uploadType = req.path.includes('cover') ? 'cover-image' : 'profile-image';
 
-    const uploadType = isCover ? 'cover-image' : 'profile-image';
-
-    // Clean up old photo if it exists
-    const oldPhotoUrl = isCover ? profile.coverPhoto : profile.profilePhoto;
-    if (oldPhotoUrl) {
-      const oldFile = await File.findOne({ secureUrl: oldPhotoUrl, uploadType });
-      if (oldFile) {
-        await deleteFileFromCloudinary(oldFile.publicId);
-      }
-    }
-
-    // Upload to Cloudinary using central service
-    const fileRecord = await uploadFileToCloudinary(
+    const uploadedFile = await uploadService.uploadFileToCloudinary(
       req.file,
       uploadType,
-      { profileId: profile._id },
-      req.user._id
+      { profileId: userId },
+      userId
     );
 
-    const updateField = isCover ? { coverPhoto: fileRecord.secureUrl } : { profilePhoto: fileRecord.secureUrl };
-    const updatedProfile = await Profile.findOneAndUpdate(
-      { user: req.user._id },
-      updateField,
-      { new: true }
-    );
+    let manual = await ManualProfile.findOne({ user: userId });
+    if (!manual) {
+      manual = new ManualProfile({ user: userId });
+    }
+
+    if (uploadType === 'cover-image') {
+      manual.coverPhoto = uploadedFile.secureUrl;
+    } else {
+      manual.profilePhoto = uploadedFile.secureUrl;
+    }
+
+    await manual.save();
+
+    // Compile merged profile
+    const merged = await profileService.compileAndSaveMergedProfile(userId);
 
     res.status(200).json({
       status: 'success',
-      message: `${isCover ? 'Cover' : 'Profile'} photo updated successfully.`,
-      profile: updatedProfile,
-      data: {
-        secureUrl: fileRecord.secureUrl,
-        publicId: fileRecord.publicId,
-      },
+      message: `${uploadType === 'cover-image' ? 'Cover' : 'Profile'} photo updated successfully`,
+      data: merged,
     });
   } catch (error) {
     next(error);
@@ -396,79 +179,26 @@ export const uploadPhoto = async (req, res, next) => {
 };
 
 /**
- * Upload CV Document
- */
-export const uploadCV = async (req, res, next) => {
-  try {
-    if (!req.file) {
-      return next(new AppError('No CV file uploaded.', 400));
-    }
-
-    const profile = await Profile.findOne({ user: req.user._id });
-    if (!profile) {
-      return next(new AppError('Profile not found for this user.', 404));
-    }
-
-    // Clean up old CV if it exists
-    if (profile.cvUrl) {
-      const FileModel = (await import('../models/File.js')).default;
-      const oldFile = await FileModel.findOne({ secureUrl: profile.cvUrl, uploadType: 'project-file' });
-      if (oldFile) {
-        await deleteFileFromCloudinary(oldFile.publicId);
-      }
-    }
-
-    // Upload to Cloudinary using central service (using 'project-file' type for PDFs/documents)
-    const fileRecord = await uploadFileToCloudinary(
-      req.file,
-      'project-file',
-      { profileId: profile._id },
-      req.user._id
-    );
-
-    const updatedProfile = await Profile.findOneAndUpdate(
-      { user: req.user._id },
-      { cvUrl: fileRecord.secureUrl },
-      { new: true }
-    );
-
-    res.status(200).json({
-      status: 'success',
-      message: 'CV uploaded successfully.',
-      profile: updatedProfile,
-      data: {
-        secureUrl: fileRecord.secureUrl,
-        publicId: fileRecord.publicId,
-      },
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-
-/**
- * Add Education
- * POST /api/v1/profile/education
+ * Education CRUD
  */
 export const addEducation = async (req, res, next) => {
   try {
     const education = await Education.create({
+      user: req.user._id,
       ...req.body,
-      user: req.user._id
     });
+
+    await profileService.compileAndSaveMergedProfile(req.user._id);
+
     res.status(201).json({
       status: 'success',
-      data: education
+      data: education,
     });
   } catch (error) {
     next(error);
   }
 };
 
-/**
- * Update Education
- * PUT /api/v1/profile/education/:id
- */
 export const updateEducation = async (req, res, next) => {
   try {
     const education = await Education.findOneAndUpdate(
@@ -476,22 +206,20 @@ export const updateEducation = async (req, res, next) => {
       req.body,
       { new: true, runValidators: true }
     );
+
     if (!education) {
-      return next(new AppError('Education record not found or unauthorized', 404));
+      return next(new AppError('Education record not found', 404));
     }
+
     res.status(200).json({
       status: 'success',
-      data: education
+      data: education,
     });
   } catch (error) {
     next(error);
   }
 };
 
-/**
- * Delete Education
- * DELETE /api/v1/profile/education/:id
- */
 export const deleteEducation = async (req, res, next) => {
   try {
     const education = await Education.findOneAndUpdate(
@@ -499,12 +227,16 @@ export const deleteEducation = async (req, res, next) => {
       { isDeleted: true },
       { new: true }
     );
+
     if (!education) {
-      return next(new AppError('Education record not found or unauthorized', 404));
+      return next(new AppError('Education record not found', 404));
     }
+
+    await profileService.compileAndSaveMergedProfile(req.user._id);
+
     res.status(200).json({
       status: 'success',
-      message: 'Education record deleted successfully.'
+      message: 'Education record deleted',
     });
   } catch (error) {
     next(error);
@@ -512,54 +244,26 @@ export const deleteEducation = async (req, res, next) => {
 };
 
 /**
- * Reorder Education
- * PUT /api/v1/profile/education/reorder
- */
-export const reorderEducation = async (req, res, next) => {
-  try {
-    const { orderedIds } = req.body;
-    if (!Array.isArray(orderedIds)) {
-      return next(new AppError('orderedIds must be an array of IDs', 400));
-    }
-    const operations = orderedIds.map((id, index) => ({
-      updateOne: {
-        filter: { _id: id, user: req.user._id },
-        update: { sortOrder: index }
-      }
-    }));
-    await Education.bulkWrite(operations);
-    res.status(200).json({
-      status: 'success',
-      message: 'Education list reordered successfully.'
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-
-/**
- * Add Experience
- * POST /api/v1/profile/experience
+ * Experience CRUD
  */
 export const addExperience = async (req, res, next) => {
   try {
     const experience = await Experience.create({
+      user: req.user._id,
       ...req.body,
-      user: req.user._id
     });
+
+    await profileService.compileAndSaveMergedProfile(req.user._id);
+
     res.status(201).json({
       status: 'success',
-      data: experience
+      data: experience,
     });
   } catch (error) {
     next(error);
   }
 };
 
-/**
- * Update Experience
- * PUT /api/v1/profile/experience/:id
- */
 export const updateExperience = async (req, res, next) => {
   try {
     const experience = await Experience.findOneAndUpdate(
@@ -567,22 +271,20 @@ export const updateExperience = async (req, res, next) => {
       req.body,
       { new: true, runValidators: true }
     );
+
     if (!experience) {
-      return next(new AppError('Experience record not found or unauthorized', 404));
+      return next(new AppError('Experience record not found', 404));
     }
+
     res.status(200).json({
       status: 'success',
-      data: experience
+      data: experience,
     });
   } catch (error) {
     next(error);
   }
 };
 
-/**
- * Delete Experience
- * DELETE /api/v1/profile/experience/:id
- */
 export const deleteExperience = async (req, res, next) => {
   try {
     const experience = await Experience.findOneAndUpdate(
@@ -590,12 +292,16 @@ export const deleteExperience = async (req, res, next) => {
       { isDeleted: true },
       { new: true }
     );
+
     if (!experience) {
-      return next(new AppError('Experience record not found or unauthorized', 404));
+      return next(new AppError('Experience record not found', 404));
     }
+
+    await profileService.compileAndSaveMergedProfile(req.user._id);
+
     res.status(200).json({
       status: 'success',
-      message: 'Experience record deleted successfully.'
+      message: 'Experience record deleted',
     });
   } catch (error) {
     next(error);
@@ -603,355 +309,161 @@ export const deleteExperience = async (req, res, next) => {
 };
 
 /**
- * Reorder Experience
- * PUT /api/v1/profile/experience/reorder
+ * Awards CRUD
  */
-export const reorderExperience = async (req, res, next) => {
+export const addAward = async (req, res, next) => {
   try {
-    const { orderedIds } = req.body;
-    if (!Array.isArray(orderedIds)) {
-      return next(new AppError('orderedIds must be an array of IDs', 400));
-    }
-    const operations = orderedIds.map((id, index) => ({
-      updateOne: {
-        filter: { _id: id, user: req.user._id },
-        update: { sortOrder: index }
-      }
-    }));
-    await Experience.bulkWrite(operations);
-    res.status(200).json({
-      status: 'success',
-      message: 'Experience list reordered successfully.'
+    const award = await Award.create({
+      user: req.user._id,
+      ...req.body,
     });
+    res.status(201).json({ status: 'success', data: award });
   } catch (error) {
     next(error);
   }
 };
 
-/**
- * Link & Sync ORCID Identity
- * POST /api/v1/profile/import/orcid
- */
-export const importOrcid = async (req, res, next) => {
+export const updateAward = async (req, res, next) => {
   try {
-    const { orcidId } = req.body;
-    if (!orcidId) {
-      return next(new AppError('Please provide an ORCID ID.', 400));
-    }
-
-    const identity = await AcademicIdentity.findOneAndUpdate(
-      { user: req.user._id, provider: 'orcid' },
-      {
-        identityId: orcidId,
-        profileUrl: `https://orcid.org/${orcidId}`,
-        lastSyncDate: new Date(),
-        importedMetadata: {
-          orcidId,
-          syncStatus: 'completed'
-        }
-      },
-      { upsert: true, new: true }
-    );
-
-    await AcademicProfile.findOneAndUpdate(
-      { user: req.user._id },
-      { orcid: orcidId },
-      { upsert: true }
-    );
-
-    // Mock-import education and experience items
-    await Education.create([
-      {
-        user: req.user._id,
-        degree: 'Ph.D. in Computer Science',
-        university: 'Stanford University',
-        fieldOfStudy: 'Artificial Intelligence',
-        startYear: 2020,
-        endYear: 2024,
-        description: 'Imported from ORCID: Thesis on Secure Federated Learning frameworks.'
-      }
-    ]);
-
-    await Experience.create([
-      {
-        user: req.user._id,
-        organization: 'MIT CSAIL',
-        role: 'Postdoctoral Researcher',
-        startYear: 2024,
-        isCurrent: true,
-        description: 'Imported from ORCID: Conducting research in deep generative modeling.'
-      }
-    ]);
-
-    res.status(200).json({
-      status: 'success',
-      message: 'ORCID profile linked and works imported successfully.',
-      identity
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-
-/**
- * Link & Sync LinkedIn Profile
- * POST /api/v1/profile/import/linkedin
- */
-export const importLinkedIn = async (req, res, next) => {
-  try {
-    const { linkedinUrl } = req.body;
-    if (!linkedinUrl) {
-      return next(new AppError('Please provide a LinkedIn URL.', 400));
-    }
-
-    const identity = await AcademicIdentity.findOneAndUpdate(
-      { user: req.user._id, provider: 'linkedin' },
-      {
-        identityId: linkedinUrl,
-        profileUrl: linkedinUrl,
-        lastSyncDate: new Date(),
-        importedMetadata: {
-          linkedinUrl,
-          syncStatus: 'completed'
-        }
-      },
-      { upsert: true, new: true }
-    );
-
-    await AcademicProfile.findOneAndUpdate(
-      { user: req.user._id },
-      { linkedIn: linkedinUrl },
-      { upsert: true }
-    );
-
-    await Profile.findOneAndUpdate(
-      { user: req.user._id },
-      {
-        headline: 'AI Researcher at Stanford | Ex-Google Brain',
-        bio: 'Passionate researcher focusing on the intersection of deep learning, spatial reasoning, and clinical informatics.'
-      }
-    );
-
-    res.status(200).json({
-      status: 'success',
-      message: 'LinkedIn credentials linked and profile parsed successfully.',
-      identity
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-
-/**
- * Link & Sync Scopus Profile
- * PUT /api/v1/profile/scopus
- */
-export const linkScopus = async (req, res, next) => {
-  try {
-    const { scopusId } = req.body;
-    if (!scopusId) {
-      return next(new AppError('Please provide a Scopus ID.', 400));
-    }
-
-    const identity = await AcademicIdentity.findOneAndUpdate(
-      { user: req.user._id, provider: 'scopus' },
-      {
-        identityId: scopusId,
-        profileUrl: `https://www.scopus.com/authid/detail.uri?authorId=${scopusId}`,
-        lastSyncDate: new Date(),
-        importedMetadata: {
-          scopusId,
-          syncStatus: 'completed'
-        }
-      },
-      { upsert: true, new: true }
-    );
-
-    await AcademicProfile.findOneAndUpdate(
-      { user: req.user._id },
-      { scopusId: scopusId },
-      { upsert: true }
-    );
-
-    const profile = await Profile.findOneAndUpdate(
-      { user: req.user._id },
-      {
-        $inc: {
-          citations: 820,
-          hIndex: 4,
-          i10Index: 6
-        }
-      },
-      { new: true }
-    );
-
-    res.status(200).json({
-      status: 'success',
-      message: 'Scopus ID linked and metrics synced successfully.',
-      identity,
-      profile
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-
-/**
- * Get Profile History versions list
- * GET /api/v1/profile/history
- */
-export const getProfileHistory = async (req, res, next) => {
-  try {
-    const historyList = await ProfileHistory.find({ user: req.user._id })
-      .sort({ version: -1 })
-      .select('version changeSummary createdAt');
-    
-    res.status(200).json({
-      status: 'success',
-      history: historyList
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-
-/**
- * Rollback Profile to a specific version
- * POST /api/v1/profile/rollback
- */
-export const rollbackProfile = async (req, res, next) => {
-  try {
-    const { version } = req.body;
-    if (!version) {
-      return next(new AppError('Please provide a version number to rollback to.', 400));
-    }
-
-    const history = await ProfileHistory.findOne({ user: req.user._id, version });
-    if (!history) {
-      return next(new AppError(`Profile version ${version} not found.`, 404));
-    }
-
-    const snapshot = history.snapshot;
-    const updatedProfile = await Profile.findOneAndUpdate(
-      { user: req.user._id },
-      {
-        displayName: snapshot.displayName,
-        headline: snapshot.headline,
-        bio: snapshot.bio,
-        designation: snapshot.designation,
-        department: snapshot.department,
-        institution: snapshot.institution,
-        country: snapshot.country,
-        state: snapshot.state,
-        city: snapshot.city,
-        highestQualification: snapshot.highestQualification,
-        experience: snapshot.experience,
-        phone: snapshot.phone,
-        website: snapshot.website,
-        gender: snapshot.gender,
-        languages: snapshot.languages,
-        employmentStatus: snapshot.employmentStatus,
-        profileVisibility: snapshot.profileVisibility,
-        socialLinks: snapshot.socialLinks,
-        dateOfBirth: snapshot.dateOfBirth,
-        profilePhoto: snapshot.profilePhoto,
-        coverPhoto: snapshot.coverPhoto
-      },
+    const award = await Award.findOneAndUpdate(
+      { _id: req.params.id, user: req.user._id },
+      req.body,
       { new: true, runValidators: true }
     );
+    if (!award) return next(new AppError('Award record not found', 404));
+    res.status(200).json({ status: 'success', data: award });
+  } catch (error) {
+    next(error);
+  }
+};
 
-    // Save history snapshot for the rollback action
-    try {
-      const latestHistory = await ProfileHistory.findOne({ user: req.user._id }).sort({ version: -1 });
-      const newVersion = (latestHistory?.version || 0) + 1;
-      await ProfileHistory.create({
-        user: req.user._id,
-        version: newVersion,
-        changeSummary: `Rolled back to version ${version}`,
-        snapshot: updatedProfile.toObject(),
-        changedBy: req.user._id
-      });
-    } catch (historyErr) {
-      console.error('Failed to log rollback history snapshot:', historyErr.message);
-    }
-
-    res.status(200).json({
-      status: 'success',
-      message: `Successfully rolled back to version ${version}`,
-      profile: updatedProfile
-    });
+export const deleteAward = async (req, res, next) => {
+  try {
+    const award = await Award.findOneAndUpdate(
+      { _id: req.params.id, user: req.user._id },
+      { isDeleted: true },
+      { new: true }
+    );
+    if (!award) return next(new AppError('Award record not found', 404));
+    res.status(200).json({ status: 'success', message: 'Award deleted' });
   } catch (error) {
     next(error);
   }
 };
 
 /**
- * Compare Google Scholar profile data with local DB to detect differences
- * GET /api/v1/profile/google-scholar/compare
- * POST /api/v1/profile/google-scholar/compare
+ * Certifications CRUD
  */
-export const compareGoogleScholar = async (req, res, next) => {
+export const addCertification = async (req, res, next) => {
   try {
-    const academicProfile = await AcademicProfile.findOne({ user: req.user._id });
-    if (!academicProfile || !academicProfile.googleScholar) {
-      return next(new AppError('No connected Google Scholar profile found.', 400));
+    const cert = await Certification.create({
+      user: req.user._id,
+      ...req.body,
+    });
+    res.status(201).json({ status: 'success', data: cert });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const updateCertification = async (req, res, next) => {
+  try {
+    const cert = await Certification.findOneAndUpdate(
+      { _id: req.params.id, user: req.user._id },
+      req.body,
+      { new: true, runValidators: true }
+    );
+    if (!cert) return next(new AppError('Certification not found', 404));
+    res.status(200).json({ status: 'success', data: cert });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const deleteCertification = async (req, res, next) => {
+  try {
+    const cert = await Certification.findOneAndUpdate(
+      { _id: req.params.id, user: req.user._id },
+      { isDeleted: true },
+      { new: true }
+    );
+    if (!cert) return next(new AppError('Certification not found', 404));
+    res.status(200).json({ status: 'success', message: 'Certification deleted' });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Google Scholar Link & Sync
+ */
+export const connectGoogleScholar = async (req, res, next) => {
+  try {
+    const { scholarId: inputId } = req.body;
+    if (!inputId) {
+      return next(new AppError('Google Scholar ID or URL is required', 400));
     }
 
-    const preview = await scholarService.getScholarImportPreview(academicProfile.googleScholar);
-    
-    // Find existing publications in database
-    const existingPubs = await Publication.find({ user: req.user._id }).select('title citationCount');
-    const existingTitles = existingPubs.map(p => p.title.toLowerCase().trim());
+    const scholarId = scholarService.extractScholarId(inputId) || inputId;
+    const userId = req.user._id;
 
-    // Filter publications to find new ones
-    const newPublications = preview.publications.filter(pub => 
-      !existingTitles.includes(pub.title.toLowerCase().trim())
+    // Link in ResearchIdentity
+    await ResearchIdentity.findOneAndUpdate(
+      { user: userId },
+      { googleScholar: scholarId },
+      { upsert: true }
     );
 
-    // Profile comparison
-    const currentProfile = await Profile.findOne({ user: req.user._id });
-    const profileDiff = {
-      displayName: { 
-        current: currentProfile?.displayName || '', 
-        latest: preview.profile.fullName || '', 
-        isManualOverride: currentProfile?.fieldMetadata?.get('displayName')?.source === 'manual' 
-      },
-      institution: { 
-        current: currentProfile?.institution || '', 
-        latest: preview.profile.institution || '', 
-        isManualOverride: currentProfile?.fieldMetadata?.get('institution')?.source === 'manual' 
-      },
-      department: { 
-        current: currentProfile?.department || '', 
-        latest: preview.profile.department || '', 
-        isManualOverride: currentProfile?.fieldMetadata?.get('department')?.source === 'manual' 
-      },
-      bio: { 
-        current: currentProfile?.bio || '', 
-        latest: preview.profile.interests.join(', ') || '', 
-        isManualOverride: currentProfile?.fieldMetadata?.get('bio')?.source === 'manual' 
-      },
-      website: { 
-        current: currentProfile?.website || '', 
-        latest: preview.profile.homepage || '', 
-        isManualOverride: currentProfile?.fieldMetadata?.get('website')?.source === 'manual' 
-      }
-    };
+    // Trigger sync
+    const syncResults = await scholarService.syncGoogleScholarData(userId, scholarId);
+
+    res.status(200).json({
+      status: 'success',
+      message: 'Google Scholar connected and synced successfully',
+      data: syncResults,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const syncGoogleScholar = async (req, res, next) => {
+  try {
+    const userId = req.user._id;
+    const identity = await ResearchIdentity.findOne({ user: userId });
+
+    if (!identity || !identity.googleScholar) {
+      return next(new AppError('No Google Scholar ID linked to this account', 400));
+    }
+
+    const syncResults = await scholarService.syncGoogleScholarData(userId, identity.googleScholar);
+
+    res.status(200).json({
+      status: 'success',
+      message: 'Google Scholar synced successfully',
+      data: syncResults,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getGoogleScholarStatus = async (req, res, next) => {
+  try {
+    const userId = req.user._id;
+    const scholarProfile = await GoogleScholarProfile.findOne({ user: userId });
+    const lastSyncLog = await SyncLog.findOne({ user: userId, provider: 'google-scholar' }).sort({ timestamp: -1 });
 
     res.status(200).json({
       status: 'success',
       data: {
-        authorId: academicProfile.googleScholar,
-        metricsDiff: {
-          citations: { current: currentProfile?.citations || 0, latest: preview.metrics.totalCitations },
-          hIndex: { current: currentProfile?.hIndex || 0, latest: preview.metrics.hIndex },
-          i10Index: { current: currentProfile?.i10Index || 0, latest: preview.metrics.i10Index }
-        },
-        profileDiff,
-        newPublications,
-        totalPublicationsLatest: preview.metrics.totalPublications,
-        existingCount: existingPubs.length
-      }
+        isConnected: !!scholarProfile,
+        scholarId: scholarProfile?.scholarId || '',
+        lastSync: scholarProfile?.lastSync || null,
+        lastSyncStatus: lastSyncLog?.status || 'never',
+        lastSyncRecords: lastSyncLog?.recordsSynced || 0,
+        lastSyncError: lastSyncLog?.errorMessage || '',
+      },
     });
   } catch (error) {
     next(error);
@@ -959,42 +471,17 @@ export const compareGoogleScholar = async (req, res, next) => {
 };
 
 /**
- * Sync Google Scholar data selectively
- * POST /api/v1/profile/google-scholar/sync
- * PUT /api/v1/profile/google-scholar/sync
+ * Get profile completion status
  */
-export const syncGoogleScholar = async (req, res, next) => {
+export const getProfileCompletion = async (req, res, next) => {
   try {
-    const academicProfile = await AcademicProfile.findOne({ user: req.user._id });
-    if (!academicProfile || !academicProfile.googleScholar) {
-      return next(new AppError('No connected Google Scholar profile found.', 400));
-    }
-
-    const { action, fields, publications } = req.body;
-
-    if (action === 'compare') {
-      return compareGoogleScholar(req, res, next);
-    }
-
-    let selectedPubs = null;
-    let selectedFields = null;
-
-    if (action === 'merge') {
-      selectedPubs = publications || [];
-      selectedFields = fields || [];
-    }
-
-    const result = await scholarService.importGoogleScholarProfile(
-      req.user._id, 
-      academicProfile.googleScholar, 
-      selectedPubs,
-      selectedFields
-    );
+    const userId = req.user._id;
+    const merged = await profileService.compileAndSaveMergedProfile(userId);
+    const completionInfo = await profileService.calculateProfileCompletion(merged, userId);
 
     res.status(200).json({
       status: 'success',
-      message: 'Google Scholar profile synchronized successfully.',
-      ...result,
+      data: completionInfo,
     });
   } catch (error) {
     next(error);
@@ -1002,113 +489,80 @@ export const syncGoogleScholar = async (req, res, next) => {
 };
 
 /**
- * Get Google Scholar connection status
- * GET /api/v1/profile/google-scholar/status
+ * Preview Google Scholar profile data before import
  */
-export const getGoogleScholarStatus = async (req, res, next) => {
+export const previewGoogleScholar = async (req, res, next) => {
   try {
-    const account = await ExternalAccount.findOne({ user: req.user._id, provider: 'googleScholar' });
-    if (!account) {
+    const { input } = req.query;
+    if (!input) {
+      return next(new AppError('Input query or URL or ID is required', 400));
+    }
+
+    const scholarId = scholarService.extractScholarId(input);
+
+    if (!scholarId) {
+      // It's a name or query, perform search
+      const profiles = await scholarService.searchScholarAuthors(input);
       return res.status(200).json({
         status: 'success',
-        connected: false
-      });
-    }
-
-    res.status(200).json({
-      status: 'success',
-      connected: true,
-      providerUserId: account.providerUserId,
-      profileUrl: account.profileUrl,
-      connectedAt: account.connectedAt,
-      lastSyncedAt: account.lastSyncedAt,
-      syncStatus: account.syncStatus
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-
-/**
- * PATCH Profile manually
- * PATCH /api/v1/profile
- */
-export const patchProfile = async (req, res, next) => {
-  try {
-    const profile = await Profile.findOne({ user: req.user._id });
-    if (!profile) {
-      return next(new AppError('Profile not found.', 404));
-    }
-
-    // List of allowable updates
-    const allowedFields = [
-      'displayName', 'headline', 'bio', 'designation', 'department', 'institution',
-      'country', 'state', 'city', 'highestQualification', 'experience', 'phone',
-      'website', 'gender', 'languages', 'employmentStatus', 'profileVisibility', 'dateOfBirth'
-    ];
-
-    for (const key of Object.keys(req.body)) {
-      if (allowedFields.includes(key) && req.body[key] !== undefined) {
-        updateFieldWithMetadata(profile, key, req.body[key], 'manual', req.user._id);
-      }
-    }
-
-    await profile.save();
-
-    if (req.body.displayName) {
-      const User = (await import('../models/User.js')).default;
-      await User.findByIdAndUpdate(req.user._id, { fullName: req.body.displayName });
-    }
-
-    // Log Profile History snapshot
-    try {
-      const latestHistory = await ProfileHistory.findOne({ user: req.user._id }).sort({ version: -1 });
-      const newVersion = (latestHistory?.version || 0) + 1;
-      
-      await ProfileHistory.create({
-        user: req.user._id,
-        version: newVersion,
-        changeSummary: 'Profile patched manually',
-        snapshot: profile.toObject(),
-        changedBy: req.user._id
-      });
-    } catch (err) {
-      console.error('Failed to log patched profile history:', err.message);
-    }
-
-    res.status(200).json({
-      status: 'success',
-      profile
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-
-/**
- * PATCH Social Links manually
- * PATCH /api/v1/profile/social
- */
-export const patchSocial = async (req, res, next) => {
-  try {
-    const profile = await Profile.findOne({ user: req.user._id });
-    if (!profile) {
-      return next(new AppError('Profile not found.', 404));
-    }
-
-    const socialKeys = ['linkedin', 'twitter', 'github', 'researchgate', 'orcid'];
-    if (req.body.socialLinks) {
-      for (const key of socialKeys) {
-        if (req.body.socialLinks[key] !== undefined) {
-          updateFieldWithMetadata(profile, `socialLinks.${key}`, req.body.socialLinks[key], 'manual', req.user._id);
+        data: {
+          type: 'search_results',
+          profiles
         }
-      }
-      await profile.save();
+      });
     }
+
+    // It's a valid Scholar ID, fetch details for preview
+    const payload = await scholarService.fetchScholarProfilePayload(scholarId);
+    const authorData = payload.author || {};
+    const articles = payload.articles || [];
+    const coAuthors = payload.co_authors || [];
+    const citationTable = authorData.cited_by?.table || [];
+
+    const profile = {
+      fullName: authorData.name || '',
+      affiliation: authorData.affiliations || '',
+      institution: authorData.affiliations || '',
+      department: '',
+      profilePhoto: authorData.thumbnail || '',
+      interests: authorData.interests ? authorData.interests.map(i => i.title) : [],
+      website: authorData.website || '',
+      homepage: authorData.website || ''
+    };
+
+    const metrics = {
+      totalPublications: articles.length,
+      totalCitations: citationTable[0]?.citations?.all || 0,
+      hIndex: citationTable[1]?.h_index?.all || 0,
+      i10Index: citationTable[2]?.i10_index?.all || 0
+    };
+
+    const publications = articles.map(art => ({
+      title: art.title || '',
+      authors: art.authors || '',
+      journal: art.publication || '',
+      publicationYear: art.year || null,
+      citationCount: art.cited_by?.value || 0,
+      link: art.link || ''
+    }));
+
+    const formattedCoAuthors = coAuthors.map(ca => ({
+      name: ca.name,
+      scholarId: ca.author_id,
+      thumbnail: ca.thumbnail,
+      link: ca.link
+    }));
 
     res.status(200).json({
       status: 'success',
-      profile
+      data: {
+        type: 'profile_preview',
+        authorId: scholarId,
+        profile,
+        metrics,
+        publications,
+        coAuthors: formattedCoAuthors
+      }
     });
   } catch (error) {
     next(error);
@@ -1116,38 +570,34 @@ export const patchSocial = async (req, res, next) => {
 };
 
 /**
- * PATCH Education manually
- * PATCH /api/v1/profile/education
+ * Import Google Scholar data selectively from the wizard
  */
-export const patchEducation = async (req, res, next) => {
+export const importGoogleScholar = async (req, res, next) => {
   try {
-    const { id, ...data } = req.body;
-    let education;
-
-    if (id) {
-      education = await Education.findOneAndUpdate(
-        { _id: id, user: req.user._id },
-        {
-          ...data,
-          source: 'manual',
-          lastUpdated: new Date(),
-          updatedBy: req.user._id
-        },
-        { new: true, runValidators: true }
-      );
-    } else {
-      education = await Education.create({
-        ...data,
-        user: req.user._id,
-        source: 'manual',
-        lastUpdated: new Date(),
-        updatedBy: req.user._id
-      });
+    const { authorId, selectedPubTitles, selectedFields } = req.body;
+    if (!authorId) {
+      return next(new AppError('Google Scholar ID is required', 400));
     }
+
+    const userId = req.user._id;
+
+    // Link in ResearchIdentity
+    await ResearchIdentity.findOneAndUpdate(
+      { user: userId },
+      { googleScholar: authorId },
+      { upsert: true }
+    );
+
+    const syncResults = await scholarService.importGoogleScholarData(userId, {
+      authorId,
+      selectedPubTitles,
+      selectedFields
+    });
 
     res.status(200).json({
       status: 'success',
-      data: education
+      message: 'Google Scholar profile imported successfully',
+      data: syncResults
     });
   } catch (error) {
     next(error);
@@ -1155,38 +605,14 @@ export const patchEducation = async (req, res, next) => {
 };
 
 /**
- * PATCH Experience manually
- * PATCH /api/v1/profile/experience
+ * Get Google Scholar Profile document from MongoDB
  */
-export const patchExperience = async (req, res, next) => {
+export const getGoogleScholarProfileData = async (req, res, next) => {
   try {
-    const { id, ...data } = req.body;
-    let experience;
-
-    if (id) {
-      experience = await Experience.findOneAndUpdate(
-        { _id: id, user: req.user._id },
-        {
-          ...data,
-          source: 'manual',
-          lastUpdated: new Date(),
-          updatedBy: req.user._id
-        },
-        { new: true, runValidators: true }
-      );
-    } else {
-      experience = await Experience.create({
-        ...data,
-        user: req.user._id,
-        source: 'manual',
-        lastUpdated: new Date(),
-        updatedBy: req.user._id
-      });
-    }
-
+    const profile = await GoogleScholarProfile.findOne({ user: req.user._id });
     res.status(200).json({
       status: 'success',
-      data: experience
+      data: profile
     });
   } catch (error) {
     next(error);
@@ -1194,71 +620,14 @@ export const patchExperience = async (req, res, next) => {
 };
 
 /**
- * PATCH Publications manually
- * PATCH /api/v1/profile/publications
+ * Get Google Scholar Publications from MongoDB
  */
-export const patchPublications = async (req, res, next) => {
+export const getGoogleScholarPublicationsData = async (req, res, next) => {
   try {
-    const { id, ...data } = req.body;
-    let pub;
-
-    if (id) {
-      pub = await Publication.findOne({ _id: id, user: req.user._id });
-      if (!pub) {
-        return next(new AppError('Publication not found.', 404));
-      }
-
-      for (const key of Object.keys(data)) {
-        if (pub[key] !== undefined && key !== 'user' && key !== 'fieldMetadata') {
-          updateFieldWithMetadata(pub, key, data[key], 'manual', req.user._id);
-        }
-      }
-      await pub.save();
-
-      await PublicationHistory.create({
-        publication: pub._id,
-        user: req.user._id,
-        action: 'update_metadata',
-        details: 'Manually updated metadata'
-      });
-    } else {
-      pub = new Publication({
-        ...data,
-        user: req.user._id
-      });
-
-      for (const key of Object.keys(data)) {
-        updateFieldWithMetadata(pub, key, data[key], 'manual', req.user._id);
-      }
-      await pub.save();
-
-      // Create Publication Author mappings
-      if (data.authors) {
-        const authorNames = data.authors.split(',');
-        for (let i = 0; i < authorNames.length; i++) {
-          await PublicationAuthor.create({
-            publication: pub._id,
-            user: i === 0 ? req.user._id : undefined,
-            authorName: authorNames[i].trim(),
-            authorOrder: i + 1
-          });
-        }
-      }
-
-      await PublicationHistory.create({
-        publication: pub._id,
-        user: req.user._id,
-        action: 'create',
-        details: 'Manually added publication'
-      });
-    }
-
-    // Recalculate researcher metrics
-    await Profile.recalculateMetrics(req.user._id);
-
+    const publications = await ScholarPublication.find({ user: req.user._id, isDeleted: false });
     res.status(200).json({
       status: 'success',
-      data: pub
+      data: publications
     });
   } catch (error) {
     next(error);
@@ -1266,62 +635,14 @@ export const patchPublications = async (req, res, next) => {
 };
 
 /**
- * PATCH Research Interests manually
- * PATCH /api/v1/profile/research
+ * Get Research Metrics from MongoDB
  */
-export const patchResearch = async (req, res, next) => {
+export const getResearchMetrics = async (req, res, next) => {
   try {
-    const { researchAreas, keywords } = req.body;
-
-    if (Array.isArray(researchAreas)) {
-      await UserResearchArea.deleteMany({ user: req.user._id });
-      for (const areaName of researchAreas) {
-        const normalized = areaName.trim();
-        if (!normalized) continue;
-        const slug = normalized.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
-
-        const areaDoc = await ResearchArea.findOneAndUpdate(
-          { slug },
-          { $setOnInsert: { areaName: normalized, slug } },
-          { upsert: true, new: true }
-        );
-
-        await UserResearchArea.create({
-          user: req.user._id,
-          researchArea: areaDoc._id,
-          source: 'manual',
-          lastUpdated: new Date(),
-          updatedBy: req.user._id
-        });
-      }
-    }
-
-    if (Array.isArray(keywords)) {
-      await UserKeyword.deleteMany({ user: req.user._id });
-      for (const kwName of keywords) {
-        const normalized = kwName.trim();
-        if (!normalized) continue;
-        const slug = normalized.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
-
-        const keywordDoc = await Keyword.findOneAndUpdate(
-          { slug },
-          { $setOnInsert: { keyword: normalized, slug } },
-          { upsert: true, new: true }
-        );
-
-        await UserKeyword.create({
-          user: req.user._id,
-          keyword: keywordDoc._id,
-          source: 'manual',
-          lastUpdated: new Date(),
-          updatedBy: req.user._id
-        });
-      }
-    }
-
+    const metrics = await ResearchMetrics.findOne({ user: req.user._id });
     res.status(200).json({
       status: 'success',
-      message: 'Research areas and keywords updated successfully.'
+      data: metrics
     });
   } catch (error) {
     next(error);
@@ -1329,21 +650,203 @@ export const patchResearch = async (req, res, next) => {
 };
 
 /**
- * Get My Co-authors
- * GET /api/v1/profile/co-authors
+ * Connect ORCID iD
  */
-export const getMyCoAuthors = async (req, res, next) => {
+export const connectOrcid = async (req, res, next) => {
   try {
-    const coAuthors = await ResearchCollaborator.find({ user: req.user._id });
+    const { orcid } = req.body;
+    const userId = req.user._id;
+
+    // Link in ResearchIdentity
+    await ResearchIdentity.findOneAndUpdate(
+      { user: userId },
+      { orcid: orcid || '' },
+      { upsert: true }
+    );
+
+    // Link in AcademicProfile
+    await AcademicProfile.findOneAndUpdate(
+      { user: userId },
+      { orcid: orcid || '' },
+      { upsert: true }
+    );
+
+    // Recalculate merged profile
+    const merged = await profileService.compileAndSaveMergedProfile(userId);
+
     res.status(200).json({
       status: 'success',
-      results: coAuthors.length,
-      coAuthors
+      message: orcid ? 'ORCID connected successfully' : 'ORCID disconnected successfully',
+      data: merged
     });
   } catch (error) {
     next(error);
   }
 };
 
+/**
+ * Connect Scopus Author ID
+ */
+export const connectScopus = async (req, res, next) => {
+  try {
+    const { scopusId } = req.body;
+    const userId = req.user._id;
 
+    // Link in ResearchIdentity
+    await ResearchIdentity.findOneAndUpdate(
+      { user: userId },
+      { scopus: scopusId || '' },
+      { upsert: true }
+    );
 
+    // Link in AcademicProfile
+    await AcademicProfile.findOneAndUpdate(
+      { user: userId },
+      { scopusId: scopusId || '' },
+      { upsert: true }
+    );
+
+    const merged = await profileService.compileAndSaveMergedProfile(userId);
+
+    res.status(200).json({
+      status: 'success',
+      message: scopusId ? 'Scopus ID connected successfully' : 'Scopus ID disconnected successfully',
+      data: merged
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Connect ResearchGate Profile
+ */
+export const connectResearchGate = async (req, res, next) => {
+  try {
+    const { researchGateUrl } = req.body;
+    const userId = req.user._id;
+
+    // Link in ResearchIdentity
+    await ResearchIdentity.findOneAndUpdate(
+      { user: userId },
+      { researchGate: researchGateUrl || '' },
+      { upsert: true }
+    );
+
+    // Link in AcademicProfile
+    await AcademicProfile.findOneAndUpdate(
+      { user: userId },
+      { researchGate: researchGateUrl || '' },
+      { upsert: true }
+    );
+
+    const merged = await profileService.compileAndSaveMergedProfile(userId);
+
+    res.status(200).json({
+      status: 'success',
+      message: researchGateUrl ? 'ResearchGate connected successfully' : 'ResearchGate disconnected successfully',
+      data: merged
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Delete Profile (Soft Delete)
+ */
+export const deleteProfile = async (req, res, next) => {
+  try {
+    const userId = req.user._id;
+
+    // Soft delete user profile
+    await ManualProfile.findOneAndUpdate({ user: userId }, { isDeleted: true });
+    await GoogleScholarProfile.findOneAndUpdate({ user: userId }, { isDeleted: true });
+    await AcademicProfile.findOneAndUpdate({ user: userId }, { isDeleted: true });
+    await ResearchIdentity.findOneAndUpdate({ user: userId }, { isDeleted: true });
+
+    // Soft delete user account
+    await User.findByIdAndUpdate(userId, { isDeleted: true, status: 'deleted' });
+
+    res.status(200).json({
+      status: 'success',
+      message: 'Researcher profile and account deleted successfully'
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Follow a Researcher (via req.body.userId)
+ */
+export const followResearcherDirect = async (req, res, next) => {
+  try {
+    const followerId = req.user._id;
+    const { userId: followingId } = req.body;
+
+    if (!followingId) {
+      return next(new AppError('Target User ID to follow is required', 400));
+    }
+
+    const { follow } = await followService.followUser(followerId, followingId);
+
+    res.status(200).json({
+      status: 'success',
+      message: 'Followed researcher successfully',
+      data: follow
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Unfollow a Researcher (via req.body.userId)
+ */
+export const unfollowResearcherDirect = async (req, res, next) => {
+  try {
+    const followerId = req.user._id;
+    const { userId: followingId } = req.body;
+
+    if (!followingId) {
+      return next(new AppError('Target User ID to unfollow is required', 400));
+    }
+
+    await followService.unfollowUser(followerId, followingId);
+
+    res.status(200).json({
+      status: 'success',
+      message: 'Unfollowed researcher successfully'
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Share a Profile
+ */
+export const shareProfileDirect = async (req, res, next) => {
+  try {
+    const { profileId } = req.body;
+    const userId = req.user._id;
+
+    // Log the share event as an activity log
+    await ActivityLog.create({
+      user: userId,
+      activity: `Shared profile: ${profileId || userId}`,
+      ipAddress: req.ip,
+      browser: req.headers['user-agent'] || '',
+    });
+
+    res.status(200).json({
+      status: 'success',
+      data: {
+        shareUrl: `http://localhost:5173/profile/user/${profileId || userId}`
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+};

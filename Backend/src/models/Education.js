@@ -81,6 +81,7 @@ const educationSchema = new mongoose.Schema(
   },
   {
     timestamps: true,
+    collection: 'education',
   }
 );
 

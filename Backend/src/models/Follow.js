@@ -16,7 +16,7 @@ const followSchema = new mongoose.Schema(
   },
   {
     timestamps: { createdAt: true, updatedAt: false }, // Only store createdAt
-    collection: 'follows',
+    collection: 'following',
   }
 );
 

@@ -8,38 +8,26 @@ const publicationFileSchema = new mongoose.Schema(
       required: [true, 'File must belong to a publication'],
       index: true,
     },
-    version: {
-      type: Number,
+    fileType: {
+      type: String,
       required: true,
-      default: 1,
+      enum: ['PDF', 'Cover Image', 'Dataset', 'Presentation', 'Code ZIP', 'Supplementary Files'],
+    },
+    url: {
+      type: String,
+      required: [true, 'File URL is required'],
+    },
+    publicId: {
+      type: String,
+      default: '', // Cloudinary public ID
     },
     fileName: {
       type: String,
-      required: [true, 'File name is required'],
-      trim: true,
-    },
-    fileType: {
-      type: String,
-      required: [true, 'File type is required'],
-      trim: true,
-    },
-    cloudinaryPublicId: {
-      type: String,
-      required: [true, 'Cloudinary public ID is required'],
-    },
-    fileUrl: {
-      type: String,
-      required: [true, 'File URL is required'],
-      trim: true,
+      required: true,
     },
     fileSize: {
       type: Number, // in bytes
-      default: 0,
-    },
-    uploadedBy: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'User',
-      required: [true, 'Uploader user is required'],
+      required: true,
     },
   },
   {

@@ -116,6 +116,7 @@ const projectSchema = new mongoose.Schema(
   },
   {
     timestamps: true,
+    collection: 'projects',
   }
 );
 

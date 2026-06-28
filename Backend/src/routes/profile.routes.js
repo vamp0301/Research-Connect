@@ -3,9 +3,8 @@ import multer from 'multer';
 import path from 'path';
 import * as profileController from '../controllers/profile.controller.js';
 import { protect } from '../middleware/auth.middleware.js';
-import { validateProfileUpdate } from '../validations/user.validation.js';
 
-// Configure Multer Storage for file uploads
+// Configure Multer storage for local fallback
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     cb(null, 'uploads/');
@@ -18,95 +17,77 @@ const storage = multer.diskStorage({
 
 const upload = multer({
   storage,
-  limits: { fileSize: 2 * 1024 * 1024 }, // 2MB Limit
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
   fileFilter: (req, file, cb) => {
-    const filetypes = /jpeg|jpg|png|webp/;
+    const filetypes = /jpeg|jpg|png|webp|pdf/;
     const extname = filetypes.test(path.extname(file.originalname).toLowerCase());
     const mimetype = filetypes.test(file.mimetype);
 
     if (extname && mimetype) {
       return cb(null, true);
     }
-    cb(new Error('Only images (jpg, jpeg, png, webp) are allowed!'));
-  },
-});
-
-const cvStorage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, 'uploads/');
-  },
-  filename: (req, file, cb) => {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
-    cb(null, 'cv-' + uniqueSuffix + path.extname(file.originalname));
-  },
-});
-
-const cvUpload = multer({
-  storage: cvStorage,
-  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB Limit
-  fileFilter: (req, file, cb) => {
-    const filetypes = /pdf|doc|docx/;
-    const extname = filetypes.test(path.extname(file.originalname).toLowerCase());
-    const mimetype = filetypes.test(file.mimetype);
-
-    if (extname || mimetype) {
-      return cb(null, true);
-    }
-    cb(new Error('Only document files (pdf, doc, docx) are allowed!'));
+    cb(new Error('Only images (jpg, jpeg, png, webp) and PDFs are allowed!'));
   },
 });
 
 const router = express.Router();
 
-// Apply protect middleware to all profile routes
+// All profile routes require authentication
 router.use(protect);
 
+// Basic Profile Details
 router.get('/me', profileController.getMyProfile);
-router.get('/co-authors', profileController.getMyCoAuthors);
 router.get('/user/:id', profileController.getProfileByUserId);
-router.put('/', validateProfileUpdate, profileController.updateProfile);
-router.get('/history', profileController.getProfileHistory);
-router.post('/rollback', profileController.rollbackProfile);
+router.put('/', profileController.updateProfile);
+router.get('/completion', profileController.getProfileCompletion);
 
-// Google Scholar Integration Routes
-router.get('/google-scholar/preview', profileController.previewGoogleScholar);
-router.post('/google-scholar/preview', profileController.previewGoogleScholar);
-router.get('/google-scholar/compare', profileController.compareGoogleScholar);
-router.post('/google-scholar/compare', profileController.compareGoogleScholar);
-router.post('/google-scholar/import', profileController.importGoogleScholar);
-router.put('/google-scholar/sync', profileController.syncGoogleScholar);
-router.post('/google-scholar/sync', profileController.syncGoogleScholar);
-router.get('/google-scholar/status', profileController.getGoogleScholarStatus);
-router.delete('/google-scholar/unlink', profileController.unlinkGoogleScholar);
-router.post('/google-scholar/refresh', profileController.refreshGoogleScholar);
-router.post('/import/orcid', profileController.importOrcid);
-router.post('/import/linkedin', profileController.importLinkedIn);
-router.put('/scopus', profileController.linkScopus);
-
-// PATCH manual edit routes
-router.patch('/', profileController.patchProfile);
-router.patch('/education', profileController.patchEducation);
-router.patch('/experience', profileController.patchExperience);
-router.patch('/research', profileController.patchResearch);
-router.patch('/social', profileController.patchSocial);
-router.patch('/publications', profileController.patchPublications);
-
+// Image Uploads
 router.post('/photo', upload.single('photo'), profileController.uploadPhoto);
 router.post('/cover', upload.single('cover'), profileController.uploadPhoto);
-router.post('/upload-photo', upload.single('photo'), profileController.uploadPhoto);
-router.post('/upload-cover', upload.single('cover'), profileController.uploadPhoto);
-router.post('/upload-cv', cvUpload.single('cv'), profileController.uploadCV);
 
-// Education Routes
+// Education
 router.post('/education', profileController.addEducation);
-router.put('/education/reorder', profileController.reorderEducation);
 router.put('/education/:id', profileController.updateEducation);
 router.delete('/education/:id', profileController.deleteEducation);
 
-// Experience Routes
+// Experience
 router.post('/experience', profileController.addExperience);
-router.put('/experience/reorder', profileController.reorderExperience);
 router.put('/experience/:id', profileController.updateExperience);
 router.delete('/experience/:id', profileController.deleteExperience);
+
+// Awards
+router.post('/awards', profileController.addAward);
+router.put('/awards/:id', profileController.updateAward);
+router.delete('/awards/:id', profileController.deleteAward);
+
+// Certifications
+router.post('/certifications', profileController.addCertification);
+router.put('/certifications/:id', profileController.updateCertification);
+router.delete('/certifications/:id', profileController.deleteCertification);
+
+// Google Scholar Sync
+router.post('/scholar/connect', profileController.connectGoogleScholar);
+router.post('/scholar/sync', profileController.syncGoogleScholar);
+router.get('/scholar/status', profileController.getGoogleScholarStatus);
+router.get('/google-scholar/preview', profileController.previewGoogleScholar);
+router.post('/google-scholar/import', profileController.importGoogleScholar);
+
+// Connect external identities
+router.post('/orcid', profileController.connectOrcid);
+router.post('/google-scholar', profileController.connectGoogleScholar);
+router.post('/scopus', profileController.connectScopus);
+router.post('/researchgate', profileController.connectResearchGate);
+router.post('/sync-google-scholar', profileController.syncGoogleScholar);
+router.get('/metrics', profileController.getResearchMetrics);
+
+// Social follows & share
+router.post('/follow', profileController.followResearcherDirect);
+router.post('/unfollow', profileController.unfollowResearcherDirect);
+router.post('/share', profileController.shareProfileDirect);
+
+// Extra REST aliases
+router.get('/', profileController.getMyProfile);
+router.get('/:id', profileController.getProfileByUserId);
+router.delete('/', profileController.deleteProfile);
 
 export default router;

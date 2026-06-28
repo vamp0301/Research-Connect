@@ -1,44 +1,10 @@
-import { Router } from 'express';
+import express from 'express';
 import multer from 'multer';
 import path from 'path';
-import {
-  createPublication,
-  getAllPublications,
-  getPublicationById,
-  updatePublication,
-  deletePublication,
-  incrementCitation,
-  searchPublications,
-  getPublicationVersions,
-  restorePublicationVersion,
-  uploadPublicationFile,
-  logAnalyticsEvent,
-  lookupDoi,
-  getPublicationTypes,
-  createPublicationType,
-  getLicenses,
-  uploadCoverImage,
-  uploadSupplementaryFiles,
-  publishDraft,
-  getPublicationDownload,
-  getPublicationRead,
-  getPublicationSource,
-  logPublicationView,
-  logPublicationDownload,
-  togglePublicationBookmark,
-  logPublicationShare,
-  getPublicationPdf,
-  getPublicationCitation,
-} from '../controllers/publication.controller.js';
-import {
-  createPublicationValidator,
-  updatePublicationValidator,
-  getPublicationsValidator,
-  mongoIdValidator,
-} from '../validations/publication.validation.js';
+import * as publicationController from '../controllers/publication.controller.js';
 import { protect } from '../middleware/auth.middleware.js';
 
-// Configure Multer Storage for file uploads
+// Configure Multer storage for local fallback
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     cb(null, 'uploads/');
@@ -49,87 +15,47 @@ const storage = multer.diskStorage({
   },
 });
 
-// Permissive filter for supplementary files
-const fileUpload = multer({
+const upload = multer({
   storage,
-  limits: { fileSize: 50 * 1024 * 1024 }, // 50MB Limit
+  limits: { fileSize: 20 * 1024 * 1024 }, // 20MB limit for PDFs / ZIP datasets
   fileFilter: (req, file, cb) => {
-    // Highly permissive for academic/research files
-    const allowedExts = /pdf|docx|doc|ppt|pptx|zip|tar|gz|csv|xlsx|xls|json|png|jpg|jpeg|gif|webp|mp4|webm|txt|py|js|ts|cpp|java|go|rs|r|rmd|m|h|c/i;
-    const ext = path.extname(file.originalname).toLowerCase();
-    
-    if (allowedExts.test(ext)) {
+    const filetypes = /pdf|zip|rar|tar|gz|jpeg|jpg|png|webp|csv|xlsx|txt/;
+    const extname = filetypes.test(path.extname(file.originalname).toLowerCase());
+    const mimetype = filetypes.test(file.mimetype);
+
+    if (extname || mimetype) {
       return cb(null, true);
     }
-    cb(new Error(`File format ${ext} is not supported. Please upload standard research files.`));
+    cb(new Error('Uploaded file type is not supported!'));
   },
 });
 
-// Restrictive filter for cover images
-const coverUpload = multer({
-  storage,
-  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB Limit
-  fileFilter: (req, file, cb) => {
-    const allowedMimeTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp'];
-    if (allowedMimeTypes.includes(file.mimetype)) {
-      return cb(null, true);
-    }
-    cb(new Error('Only PNG, JPG, JPEG or WEBP images are allowed as cover images.'));
-  },
-});
+const router = express.Router();
 
-const router = Router();
+// Apply protect middleware to routes requiring auth
+router.use(protect);
 
-// Metadata and lookups (must come before /:id)
-router.get('/metadata/doi', lookupDoi);
-router.get('/types', getPublicationTypes);
-router.post('/types', protect, createPublicationType);
-router.get('/licenses', getLicenses);
-router.get('/search', searchPublications);
+// Main publication search & CRUD
+router.get('/', publicationController.searchPublications);
+router.get('/my', publicationController.getMyPublications);
+router.post('/', publicationController.createPublication);
+router.get('/doi/:doi', publicationController.resolveDoi);
 
-// Analytics, bookmark, share POST routes (must come before /:id)
-router.post('/views', logPublicationView);
-router.post('/downloads', logPublicationDownload);
-router.post('/bookmark', protect, togglePublicationBookmark);
-router.post('/share', logPublicationShare);
+router.get('/:id', publicationController.getPublicationDetails);
+router.put('/:id', publicationController.updatePublication);
+router.delete('/:id', publicationController.deletePublication);
 
-// GET routes (must come before /:id)
-router.get('/download/:id', getPublicationDownload);
-router.get('/read/:id', getPublicationRead);
-router.get('/source/:id', getPublicationSource);
-router.get('/pdf/:id', getPublicationPdf);
-router.get('/citation/:id', getPublicationCitation);
+// Version history
+router.get('/:id/versions', publicationController.getVersionHistory);
+router.post('/:id/rollback', publicationController.rollbackVersion);
 
-// Core publications routes
-router
-  .route('/')
-  .get(getPublicationsValidator, getAllPublications)
-  .post(protect, createPublicationValidator, createPublication);
+// Files
+router.post('/upload', upload.single('file'), publicationController.uploadFile);
+router.delete('/files/:fileId', publicationController.removeFile);
+router.get('/download/:fileId', publicationController.downloadFile);
 
-// GET publication detail allows ObjectId or Slug
-router.get('/:id', getPublicationById);
-
-router
-  .route('/:id')
-  .put(protect, mongoIdValidator, updatePublicationValidator, updatePublication)
-  .delete(protect, mongoIdValidator, deletePublication);
-
-// Publishing draft
-router.post('/:id/publish', protect, mongoIdValidator, publishDraft);
-
-// Increment citation count
-router.patch('/:id/citation', mongoIdValidator, incrementCitation);
-
-// Version history & restore
-router.get('/:id/versions', protect, getPublicationVersions);
-router.post('/:id/versions/:versionNum/restore', protect, restorePublicationVersion);
-
-// Files uploads
-router.post('/:id/files', protect, fileUpload.single('file'), uploadPublicationFile);
-router.post('/:id/cover', protect, coverUpload.single('coverImage'), uploadCoverImage);
-router.post('/:id/files-multiple', protect, fileUpload.array('files', 10), uploadSupplementaryFiles);
-
-// Analytics logging
-router.post('/:id/analytics/log', logAnalyticsEvent);
+// Comments
+router.get('/:id/comments', publicationController.getComments);
+router.post('/:id/comments', publicationController.addComment);
 
 export default router;

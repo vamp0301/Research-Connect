@@ -8,6 +8,7 @@ import connectDB from './config/db.js';
 import { initSocket } from './services/socket.service.js';
 
 import { verifyCloudinaryConnection } from './services/upload.service.js';
+import { runDailyBackgroundSync } from './services/scholar.service.js';
 
 // Handle uncaught exceptions globally
 process.on('uncaughtException', (err) => {
@@ -45,6 +46,10 @@ const startServer = async () => {
 
     // Initialize Socket.io
     initSocket(server);
+
+    // 5. Start Google Scholar Background Sync (runs every 24 hours)
+    runDailyBackgroundSync();
+    setInterval(runDailyBackgroundSync, 24 * 60 * 60 * 1000);
 
     // Handle unhandled promise rejections globally
     process.on('unhandledRejection', (err) => {

@@ -59,6 +59,7 @@ const keywordSchema = new mongoose.Schema(
   },
   {
     timestamps: true,
+    collection: 'keywords',
   }
 );
 

@@ -8,7 +8,6 @@ import responseFormatter from './middleware/responseFormatter.js';
 import AppError from './utils/AppError.js';
 import apiRouter from './routes/index.js';
 import { rateLimiter, mongoSanitize } from './middleware/security.middleware.js';
-
 const app = express();
 
 // Standardize all response formats

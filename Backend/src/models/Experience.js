@@ -92,6 +92,7 @@ const experienceSchema = new mongoose.Schema(
   },
   {
     timestamps: true,
+    collection: 'experiences',
   }
 );
 

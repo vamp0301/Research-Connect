@@ -10,7 +10,8 @@ import {
   X, 
   ExternalLink, 
   RefreshCw,
-  Trash2
+  Trash2,
+  ChevronRight
 } from 'lucide-react';
 import api from '../../services/api';
 import Button from '../../components/common/Button.jsx';
