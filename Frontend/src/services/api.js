@@ -35,7 +35,7 @@ api.interceptors.response.use(
         );
         
         if (res.data?.success) {
-          const newToken = res.data.token;
+          const newToken = res.data.data?.token || res.data.token;
           localStorage.setItem('token', newToken);
           
           // Update the Authorization header in the original request and retry it

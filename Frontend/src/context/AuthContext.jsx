@@ -8,7 +8,7 @@ const AuthContext = createContext(null);
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('token');
-    if (token) {
+    if (token && token !== 'undefined' && token !== 'null') {
       config.headers.Authorization = `Bearer ${token}`;
     }
     return config;
@@ -100,7 +100,7 @@ export const AuthProvider = ({ children }) => {
     try {
       const refreshResponse = await api.post('/auth/refresh-token');
       if (refreshResponse.data?.success) {
-        const newToken = refreshResponse.data.token;
+        const newToken = refreshResponse.data.data?.token || refreshResponse.data.token;
         const userObj = refreshResponse.data.data.user;
         
         localStorage.setItem('token', newToken);
@@ -159,9 +159,10 @@ export const AuthProvider = ({ children }) => {
     const response = await api.post('/auth/login', { email, password, deviceId, deviceName });
     
     // If the device was already trusted and we logged in successfully without OTP
-    if (response.data?.success && !response.data?.otpRequired && response.data?.token) {
+    const responseToken = response.data?.data?.token || response.data?.token;
+    if (response.data?.success && !response.data?.otpRequired && responseToken) {
       const userObj = response.data.data.user;
-      const token = response.data.token;
+      const token = responseToken;
       
       localStorage.setItem('token', token);
       localStorage.setItem('accessToken', token); // compatibility
@@ -184,7 +185,7 @@ export const AuthProvider = ({ children }) => {
     
     if (response.data?.success) {
       const userObj = response.data.data.user;
-      const token = response.data.token;
+      const token = response.data.data?.token || response.data.token;
       
       localStorage.setItem('token', token);
       localStorage.setItem('accessToken', token); // compatibility
