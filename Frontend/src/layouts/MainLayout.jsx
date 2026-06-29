@@ -1,23 +1,23 @@
 import React, { useState } from 'react';
 import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom';
-import { 
-  Microscope, 
-  LogOut, 
-  User, 
-  Compass, 
-  HelpCircle, 
-  LayoutDashboard, 
-  BookOpen, 
-  FolderGit2, 
-  Handshake, 
-  MessageSquare, 
-  Bell, 
-  Bookmark, 
-  Users2, 
-  Users, 
-  Settings, 
-  Plus, 
-  Search, 
+import {
+  Microscope,
+  LogOut,
+  User,
+  Compass,
+  HelpCircle,
+  LayoutDashboard,
+  BookOpen,
+  FolderGit2,
+  Handshake,
+  MessageSquare,
+  Bell,
+  Bookmark,
+  Users2,
+  Users,
+  Settings,
+  Plus,
+  Search,
   ChevronDown,
   Menu,
   X
@@ -51,6 +51,12 @@ const MainLayout = () => {
     { label: 'Settings', path: '/settings', icon: Settings },
   ];
 
+  const handleSearch = (e) => {
+    if (e.key === 'Enter' && searchQuery.trim()) {
+      navigate(`/search?q=${encodeURIComponent(searchQuery.trim())}`);
+    }
+  };
+
   // If user is logged in, show the left sidebar Dashboard layout
   if (user) {
     return (
@@ -79,20 +85,18 @@ const MainLayout = () => {
                 <Link
                   key={item.label}
                   to={item.path}
-                  className={`flex items-center justify-between px-4 py-2.5 rounded-xl text-sm font-medium transition-all group ${
-                    isActive 
-                      ? 'bg-blue-600 text-white shadow-md shadow-blue-500/10' 
-                      : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
-                  }`}
+                  className={`flex items-center justify-between px-4 py-2.5 rounded-xl text-sm font-medium transition-all group ${isActive
+                    ? 'bg-blue-600 text-white shadow-md shadow-blue-500/10'
+                    : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+                    }`}
                 >
                   <div className="flex items-center gap-3">
                     <Icon className={`w-4 h-4 ${isActive ? 'text-white' : 'text-slate-400 group-hover:text-slate-700'}`} />
                     <span>{item.label}</span>
                   </div>
                   {item.badge && (
-                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
-                      isActive ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500'
-                    }`}>
+                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${isActive ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500'
+                      }`}>
                       {item.badge}
                     </span>
                   )}
@@ -103,10 +107,13 @@ const MainLayout = () => {
 
           {/* Bottom Action Button */}
           <div className="p-4 border-t border-slate-100">
-            <button className="flex items-center justify-center gap-2 w-full py-2.5 border border-blue-200 text-blue-600 hover:bg-blue-50/50 rounded-xl text-sm font-semibold transition-colors cursor-pointer">
+            <button
+              onClick={() => navigate('/publications/upload')}
+              className="flex items-center justify-center gap-2 w-full py-2.5 border border-blue-200 text-blue-600 hover:bg-blue-50/50 rounded-xl text-sm font-semibold transition-colors cursor-pointer"
+            >
               <Plus className="w-4 h-4" /> Upload Publication
             </button>
-            <button 
+            <button
               onClick={handleLogout}
               className="flex items-center justify-center gap-2 w-full mt-2 py-2 text-slate-500 hover:text-red-600 rounded-xl text-xs font-medium transition-colors cursor-pointer"
             >
@@ -131,26 +138,27 @@ const MainLayout = () => {
               <nav className="flex-1 px-4 py-6 space-y-1 text-left">
                 {navItems.map((item) => {
                   const Icon = item.icon;
-                  const isActive = location.pathname === item.path;
+                  const isActive =
+                    location.pathname === item.path ||
+                    (item.path === '/profile' &&
+                      location.pathname.startsWith('/profile'));
                   return (
                     <Link
                       key={item.label}
                       to={item.path}
                       onClick={() => setMobileSidebarOpen(false)}
-                      className={`flex items-center justify-between px-4 py-2.5 rounded-xl text-sm font-medium transition-all ${
-                        isActive 
-                          ? 'bg-blue-600 text-white' 
-                          : 'text-slate-600 hover:bg-slate-50'
-                      }`}
+                      className={`flex items-center justify-between px-4 py-2.5 rounded-xl text-sm font-medium transition-all ${isActive
+                        ? 'bg-blue-600 text-white'
+                        : 'text-slate-600 hover:bg-slate-50'
+                        }`}
                     >
                       <div className="flex items-center gap-3">
                         <Icon className="w-4 h-4" />
                         <span>{item.label}</span>
                       </div>
                       {item.badge && (
-                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
-                          isActive ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500'
-                        }`}>
+                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${isActive ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500'
+                          }`}>
                           {item.badge}
                         </span>
                       )}
@@ -168,19 +176,20 @@ const MainLayout = () => {
           <header className="h-16 bg-white border-b border-slate-200/80 flex items-center justify-between px-6 lg:px-8 z-10 shrink-0">
             {/* Left: Search Bar & Mobile Menu Trigger */}
             <div className="flex items-center gap-4 flex-1 max-w-xl">
-              <button 
+              <button
                 onClick={() => setMobileSidebarOpen(true)}
                 className="lg:hidden p-2 -ml-2 rounded-lg text-slate-500 hover:bg-slate-100"
               >
                 <Menu className="w-5 h-5" />
               </button>
-              
+
               <div className="relative w-full max-w-md hidden sm:block">
                 <input
                   type="text"
                   placeholder="Search researchers, publications, keywords..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
+                  onKeyDown={handleSearch}
                   className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-sans focus:outline-none focus:border-blue-600 focus:bg-white transition-colors"
                 />
                 <Search className="absolute left-3.5 top-2.5 w-4 h-4 text-slate-400" />
@@ -208,13 +217,17 @@ const MainLayout = () => {
               {/* User Dropdown */}
               <div className="flex items-center gap-3 pl-2 border-l border-slate-200/80">
                 <img
-                  src={user.profilePhoto || 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=facearea&facepad=2&w=256&h=256&q=80'}
+                  src={
+                    user?.profilePhoto ||
+                    user?.user?.profilePhoto ||
+                    'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=facearea&facepad=2&w=256&h=256&q=80'
+                  }
                   alt={user.user?.fullName || 'User Profile'}
                   className="w-9 h-9 rounded-full object-cover border border-slate-100 shadow-sm"
                 />
                 <div className="hidden md:flex flex-col text-left">
                   <span className="text-xs font-semibold text-slate-800 tracking-tight leading-none">
-                    {user.user?.fullName || 'Dr. Arjun Sharma'}
+                    {user?.user?.fullName || user?.fullName || 'User'}
                   </span>
                   <span className="text-[10px] text-slate-400 font-medium capitalize mt-1">
                     {user.designation || 'Researcher'}
