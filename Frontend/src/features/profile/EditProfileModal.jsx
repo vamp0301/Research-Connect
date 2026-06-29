@@ -25,7 +25,7 @@ const EditProfileModal = ({ isOpen, onClose, initialData, onSaveSuccess }) => {
     socialLinks: {
       linkedin: '',
       twitter: '',
-      github: '',
+     
       researchgate: '',
       orcid: ''
     }
@@ -106,7 +106,7 @@ const EditProfileModal = ({ isOpen, onClose, initialData, onSaveSuccess }) => {
         socialLinks: {
           linkedin: initialData.socialLinks?.linkedin || '',
           twitter: initialData.socialLinks?.twitter || '',
-          github: initialData.socialLinks?.github || '',
+         
           researchgate: initialData.socialLinks?.researchgate || '',
           orcid: initialData.socialLinks?.orcid || ''
         }

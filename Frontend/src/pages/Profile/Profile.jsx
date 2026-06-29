@@ -58,11 +58,7 @@ const providerIcons = {
       <path d="M19.37 11.56c-.02-.08-.06-.16-.1-.23L16.48 6.5h-2.92v11h2.17v-4.14h.77l2.25 4.14h2.46l-2.62-4.81c1.07-.44 1.83-1.5 1.83-2.73a2.91 2.91 0 0 0-.05-.4zm-3.64-1.25V8.26h.81c.73 0 1.18.33 1.18.98 0 .66-.45.99-1.18.99h-.81zM9.43 11.56c0-.85-.18-1.5-.53-1.93-.35-.44-.9-.65-1.62-.65H5.21v5.19h2.07c.72 0 1.27-.21 1.62-.65.35-.43.53-1.08.53-1.96zm-2.07 4.13H5.21v2.18H3.04v-11h4.24c1.35 0 2.41.38 3.19 1.14.77.76 1.16 1.85 1.16 3.26 0 1.4-.39 2.49-1.16 3.25-.78.77-1.84 1.17-3.19 1.17z"/>
     </svg>
   ),
-  'GitHub': (
-    <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="#181717">
-      <path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/>
-    </svg>
-  ),
+  
   'Website': (
     <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="#2563EB" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <circle cx="12" cy="12" r="10" />
@@ -246,12 +242,7 @@ const ProfilePage = () => {
       value: profileData?.academicProfile?.researchGate || profileData?.socialLinks?.researchgate,
       url: (profileData?.academicProfile?.researchGate || profileData?.socialLinks?.researchgate) ? `https://researchgate.net/profile/${profileData.academicProfile?.researchGate || profileData.socialLinks?.researchgate}` : null,
     },
-    {
-      name: 'GitHub',
-      connected: !!profileData?.socialLinks?.github,
-      value: profileData?.socialLinks?.github,
-      url: profileData?.socialLinks?.github ? (profileData.socialLinks.github.startsWith('http') ? profileData.socialLinks.github : `https://github.com/${profileData.socialLinks.github}`) : null,
-    },
+
     {
       name: 'Website',
       connected: !!profileData?.website,
@@ -754,28 +745,7 @@ const ProfilePage = () => {
                       </div>
                     </div>
 
-                    {/* GitHub */}
-                    <div className="flex items-start gap-3">
-                      <div className="w-9 h-9 rounded-xl bg-white border border-slate-200/60 shadow-sm flex items-center justify-center shrink-0 mt-0.5">
-                        {providerIcons['GitHub']}
-                      </div>
-                      <div>
-                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide block">GitHub</span>
-                        {profileData?.socialLinks?.github ? (
-                          <a 
-                            href={profileData.socialLinks.github.startsWith('http') ? profileData.socialLinks.github : `https://github.com/${profileData.socialLinks.github}`} 
-                            target="_blank" 
-                            rel="noopener noreferrer"
-                            className="text-sm font-semibold text-slate-800 hover:text-blue-600 flex items-center gap-1 group/link"
-                          >
-                            {profileData.socialLinks.github}
-                            <ExternalLink className="w-3 h-3 text-slate-400 opacity-0 group-hover/link:opacity-100 transition-opacity" />
-                          </a>
-                        ) : (
-                          <span className="text-sm font-semibold text-slate-400 italic">Not Linked</span>
-                        )}
-                      </div>
-                    </div>
+                   
                   </div>
                 </div>
               </div>
