@@ -1,184 +1,304 @@
 import React, { useState } from 'react';
+import { useForm } from 'react-hook-form';
 import { useNavigate, Link } from 'react-router-dom';
-import { User, Mail, Lock, UserPlus, AlertCircle, Award } from 'lucide-react';
-import Input from '@/components/common/Input.jsx';
-import Button from '@/components/common/Button.jsx';
-import api from '@/services/api.js';
+import { useAuth } from '../../context/AuthContext.jsx';
+import { Eye, EyeOff, Lock, Mail, Microscope, User, Building, MapPin, Briefcase, AlertCircle, ArrowRight, ArrowLeft } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 
 const Register = () => {
+  const { register: signup } = useAuth();
   const navigate = useNavigate();
+  const [step, setStep] = useState(1);
+  const [showPassword, setShowPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
-  const [formData, setFormData] = useState({
-    username: '',
-    email: '',
-    password: '',
-    role: 'researcher',
+  const {
+    register,
+    handleSubmit,
+    trigger,
+    formState: { errors },
+  } = useForm({
+    defaultValues: {
+      fullName: '',
+      email: '',
+      password: '',
+      designation: '',
+      institution: '',
+      country: '',
+    },
   });
 
-  const [errors, setErrors] = useState({});
-  const [isLoading, setIsLoading] = useState(false);
-  const [apiError, setApiError] = useState('');
-
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
-    if (errors[name]) {
-      setErrors((prev) => ({ ...prev, [name]: '' }));
+  const nextStep = async () => {
+    // Validate only step 1 fields before proceeding
+    const isStepValid = await trigger(['fullName', 'email', 'password']);
+    if (isStepValid) {
+      setStep(2);
     }
-    setApiError('');
   };
 
-  const validate = () => {
-    const tempErrors = {};
-    if (!formData.username) {
-      tempErrors.username = 'Username is required';
-    } else if (formData.username.length < 3) {
-      tempErrors.username = 'Username must be at least 3 characters';
-    }
-    if (!formData.email) {
-      tempErrors.email = 'Email address is required';
-    } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
-      tempErrors.email = 'Please enter a valid email address';
-    }
-    if (!formData.password) {
-      tempErrors.password = 'Password is required';
-    } else if (formData.password.length < 8) {
-      tempErrors.password = 'Password must be at least 8 characters';
-    }
-    setErrors(tempErrors);
-    return Object.keys(tempErrors).length === 0;
+  const prevStep = () => {
+    setStep(1);
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (!validate()) return;
-
-    setIsLoading(true);
-    setApiError('');
-
+  const onSubmit = async (data) => {
+    setLoading(true);
+    setError('');
     try {
-      // Attempt backend signup
-      const response = await api.post('/users/register', formData);
-      if (response && response.success) {
-        localStorage.setItem('token', response.data.token);
-        localStorage.setItem('user', JSON.stringify(response.data.user));
-        navigate('/');
+      const res = await signup(data);
+      if (res.success) {
+        // Redirect to email verification with email query param
+        navigate(`/verify-email?email=${encodeURIComponent(data.email)}`);
       }
     } catch (err) {
-      console.warn('⚠️ Backend register failed. Falling back to local offline sandbox mode...', err.message);
-      
-      // Sandbox fallback for UI previewing
-      if (formData.username && formData.email && formData.password) {
-        const mockUser = {
-          username: formData.username,
-          email: formData.email,
-          role: formData.role,
-        };
-        localStorage.setItem('token', 'mock_sandbox_jwt_token_key');
-        localStorage.setItem('user', JSON.stringify(mockUser));
-        navigate('/');
-      } else {
-        setApiError(err.message || 'Registration failed');
-      }
+      console.error(err);
+      setError(err.response?.data?.message || 'Registration failed. Please try again.');
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
   };
 
   return (
-    <div className="flex flex-col gap-6 text-left">
-      <div className="text-center sm:text-left">
-        <h3 className="text-xl font-bold font-display text-[var(--color-brand-text-primary)]">Join ResearchConnect</h3>
-        <p className="text-xs text-[var(--color-brand-text-secondary)] mt-1">Connect with academics and publish studies</p>
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5 }}
+      className="space-y-6"
+    >
+      <div className="space-y-2 text-center">
+        <h2 className="text-2xl font-extrabold text-slate-900 tracking-tight font-display">
+          Create Academic Account
+        </h2>
+        <p className="text-sm text-slate-500">
+          Step {step} of 2: {step === 1 ? 'Credentials' : 'Academic Profile'}
+        </p>
+        
+        {/* Step Progress Bar */}
+        <div className="w-full bg-slate-200 h-1.5 rounded-full overflow-hidden">
+          <div 
+            className="bg-blue-600 h-1.5 rounded-full transition-all duration-300"
+            style={{ width: `${step * 50}%` }}
+          ></div>
+        </div>
       </div>
 
-      {apiError && (
-        <div className="flex items-center gap-2 p-3 bg-[var(--color-brand-red)]/10 border border-[var(--color-brand-red)]/35 text-[var(--color-brand-red)] rounded-xl text-xs">
-          <AlertCircle className="w-4 h-4 flex-shrink-0" />
-          <span>{apiError}</span>
-        </div>
-      )}
+      <AnimatePresence>
+        {error && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-xl text-sm flex items-start gap-2.5 overflow-hidden"
+          >
+            <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+            <span>{error}</span>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-      <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-        <div className="relative">
-          <Input
-            label="Username"
-            type="text"
-            name="username"
-            value={formData.username}
-            onChange={handleChange}
-            error={errors.username}
-            placeholder="johndoe"
-            required
-            className="pl-10"
-          />
-          <User className="absolute left-3.5 bottom-3.5 w-4 h-4 text-slate-500" />
-        </div>
-
-        <div className="relative">
-          <Input
-            label="Email Address"
-            type="email"
-            name="email"
-            value={formData.email}
-            onChange={handleChange}
-            error={errors.email}
-            placeholder="name@institution.edu"
-            required
-            className="pl-10"
-          />
-          <Mail className="absolute left-3.5 bottom-3.5 w-4 h-4 text-slate-500" />
-        </div>
-
-        <div className="relative">
-          <Input
-            label="Password"
-            type="password"
-            name="password"
-            value={formData.password}
-            onChange={handleChange}
-            error={errors.password}
-            placeholder="••••••••"
-            required
-            className="pl-10"
-          />
-          <Lock className="absolute left-3.5 bottom-3.5 w-4 h-4 text-slate-500" />
-        </div>
-
-        {/* Role Selection */}
-        <div className="flex flex-col gap-1.5">
-          <label className="text-xs font-semibold uppercase tracking-wider text-[var(--color-brand-text-secondary)]">
-            Select Role
-          </label>
-          <div className="relative">
-            <select
-              name="role"
-              value={formData.role}
-              onChange={handleChange}
-              className="glass-input w-full px-4 py-3 rounded-xl text-sm font-sans text-[var(--color-brand-text-primary)] border border-[var(--color-brand-border)] focus:outline-none appearance-none cursor-pointer pl-10"
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+        <AnimatePresence mode="wait">
+          {step === 1 ? (
+            <motion.div
+              key="step1"
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: 20 }}
+              transition={{ duration: 0.3 }}
+              className="space-y-4"
             >
-              <option value="researcher" className="bg-white text-[var(--color-brand-text-primary)]">Researcher</option>
-              <option value="reviewer" className="bg-white text-[var(--color-brand-text-primary)]">Reviewer / Peer Evaluator</option>
-              <option value="sponsor" className="bg-white text-[var(--color-brand-text-primary)]">Sponsor / Funding Agent</option>
-            </select>
-            <Award className="absolute left-3.5 bottom-3.5 w-4 h-4 text-slate-500" />
-          </div>
-        </div>
+              {/* Full Name */}
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-slate-600 tracking-wide uppercase">
+                  Full Name
+                </label>
+                <div className="relative">
+                  <User className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                  <input
+                    type="text"
+                    placeholder="Dr. Sarah Jenkins"
+                    {...register('fullName', {
+                      required: 'Full name is required',
+                      minLength: { value: 2, message: 'Name must be at least 2 characters' },
+                    })}
+                    className={`w-full pl-11 pr-4 py-2.5 bg-white border ${
+                      errors.fullName ? 'border-red-300 focus:ring-red-200 focus:border-red-500' : 'border-slate-200 focus:ring-blue-100 focus:border-blue-500'
+                    } rounded-xl text-sm transition-all focus:outline-none focus:ring-4`}
+                  />
+                </div>
+                {errors.fullName && (
+                  <p className="text-xs text-red-500 font-medium mt-1">{errors.fullName.message}</p>
+                )}
+              </div>
 
-        <Button type="submit" isLoading={isLoading} className="w-full mt-2">
-          Create Account <UserPlus className="w-4 h-4 ml-2" />
-        </Button>
+              {/* Email */}
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-slate-600 tracking-wide uppercase">
+                  Work Email
+                </label>
+                <div className="relative">
+                  <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                  <input
+                    type="email"
+                    placeholder="sarah.jenkins@stanford.edu"
+                    {...register('email', {
+                      required: 'Email address is required',
+                      pattern: {
+                        value: /^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,3})+$/,
+                        message: 'Please enter a valid email address',
+                      },
+                    })}
+                    className={`w-full pl-11 pr-4 py-2.5 bg-white border ${
+                      errors.email ? 'border-red-300 focus:ring-red-200 focus:border-red-500' : 'border-slate-200 focus:ring-blue-100 focus:border-blue-500'
+                    } rounded-xl text-sm transition-all focus:outline-none focus:ring-4`}
+                  />
+                </div>
+                {errors.email && (
+                  <p className="text-xs text-red-500 font-medium mt-1">{errors.email.message}</p>
+                )}
+              </div>
+
+              {/* Password */}
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-slate-600 tracking-wide uppercase">
+                  Password
+                </label>
+                <div className="relative">
+                  <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    placeholder="••••••••"
+                    {...register('password', {
+                      required: 'Password is required',
+                      minLength: { value: 8, message: 'Password must be at least 8 characters' },
+                      validate: {
+                        hasNumber: (value) => /\d/.test(value) || 'Password must contain at least one number',
+                        hasUppercase: (value) => /[A-Z]/.test(value) || 'Password must contain at least one uppercase letter',
+                      }
+                    })}
+                    className={`w-full pl-11 pr-11 py-2.5 bg-white border ${
+                      errors.password ? 'border-red-300 focus:ring-red-200 focus:border-red-500' : 'border-slate-200 focus:ring-blue-100 focus:border-blue-500'
+                    } rounded-xl text-sm transition-all focus:outline-none focus:ring-4`}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3.5 top-1/2 -translate-y-1/2 p-1 hover:bg-slate-50 text-slate-400 hover:text-slate-600 rounded-lg transition-colors"
+                  >
+                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+                {errors.password && (
+                  <p className="text-xs text-red-500 font-medium mt-1">{errors.password.message}</p>
+                )}
+              </div>
+
+              <button
+                type="button"
+                onClick={nextStep}
+                className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-semibold transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <span>Continue</span>
+                <ArrowRight className="w-4 h-4" />
+              </button>
+            </motion.div>
+          ) : (
+            <motion.div
+              key="step2"
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              transition={{ duration: 0.3 }}
+              className="space-y-4"
+            >
+              {/* Designation */}
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-slate-600 tracking-wide uppercase">
+                  Designation / Role
+                </label>
+                <div className="relative">
+                  <Briefcase className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                  <input
+                    type="text"
+                    placeholder="e.g. Professor, PhD Candidate, Scientist"
+                    {...register('designation')}
+                    className="w-full pl-11 pr-4 py-2.5 bg-white border border-slate-200 focus:ring-blue-100 focus:border-blue-500 rounded-xl text-sm transition-all focus:outline-none focus:ring-4"
+                  />
+                </div>
+              </div>
+
+              {/* Institution */}
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-slate-600 tracking-wide uppercase">
+                  Institution / University
+                </label>
+                <div className="relative">
+                  <Building className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                  <input
+                    type="text"
+                    placeholder="e.g. Stanford University"
+                    {...register('institution')}
+                    className="w-full pl-11 pr-4 py-2.5 bg-white border border-slate-200 focus:ring-blue-100 focus:border-blue-500 rounded-xl text-sm transition-all focus:outline-none focus:ring-4"
+                  />
+                </div>
+              </div>
+
+              {/* Country */}
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-slate-600 tracking-wide uppercase">
+                  Country
+                </label>
+                <div className="relative">
+                  <MapPin className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                  <input
+                    type="text"
+                    placeholder="e.g. United States"
+                    {...register('country')}
+                    className="w-full pl-11 pr-4 py-2.5 bg-white border border-slate-200 focus:ring-blue-100 focus:border-blue-500 rounded-xl text-sm transition-all focus:outline-none focus:ring-4"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  onClick={prevStep}
+                  className="py-3 border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl text-sm font-semibold transition-all flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <ArrowLeft className="w-4 h-4" />
+                  <span>Back</span>
+                </button>
+                
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white rounded-xl text-sm font-semibold transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  {loading ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white/25 border-t-white rounded-full animate-spin"></div>
+                      <span>Registering...</span>
+                    </>
+                  ) : (
+                    <span>Register</span>
+                  )}
+                </button>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </form>
 
-      <div className="border-t border-[var(--color-brand-border)] pt-4 text-center">
-        <p className="text-xs text-[var(--color-brand-text-secondary)]">
-          Already have an account?{' '}
-          <Link to="/login" className="text-[var(--color-brand-blue)] hover:underline font-semibold">
-            Sign in
-          </Link>
-        </p>
+      <div className="text-center text-sm text-slate-500">
+        Already have an account?{' '}
+        <Link
+          to="/login"
+          className="font-semibold text-blue-600 hover:text-blue-700 transition-colors"
+        >
+          Sign in
+        </Link>
       </div>
-    </div>
+    </motion.div>
   );
 };
 

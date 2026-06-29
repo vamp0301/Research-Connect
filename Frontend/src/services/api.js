@@ -1,57 +1,55 @@
 import axios from 'axios';
 
-// Get API base URL from environment variables, fallback to local port
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api/v1';
-
+// Create central Axios instance
 const api = axios.create({
-  baseURL: API_URL,
+  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:5000/api/v1',
+  withCredentials: true, // Send HTTP cookies with requests (if any)
   headers: {
     'Content-Type': 'application/json',
   },
-  withCredentials: true, // Allow cookies to be sent with requests
 });
 
-// Request Interceptor: Attach JWT Bearer Token if exists
-api.interceptors.request.use(
-  (config) => {
-    const token = localStorage.getItem('token');
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-    return config;
-  },
-  (error) => {
-    return Promise.reject(error);
-  }
-);
-
-// Response Interceptor: Uniform error handling and token invalidation redirects
+// Response interceptor to handle token refresh on 401 errors
 api.interceptors.response.use(
-  (response) => {
-    // Return the response data body directly to reduce client redundancy
-    return response.data;
-  },
-  (error) => {
+  (response) => response,
+  async (error) => {
     const originalRequest = error.config;
     
-    // In case of JWT expiry, signout user and redirect to login page
-    if (error.response && error.response.status === 401 && !originalRequest._retry) {
-      originalRequest._retry = true;
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
+    // Check if error status is 401 and request has not been retried yet
+    if (error.response?.status === 401 && !originalRequest._retry) {
+      // Avoid infinite loop if refresh token request itself fails with 401
+      if (
+        originalRequest.url.includes('/auth/refresh-token') || 
+        originalRequest.url.includes('/auth/login')
+      ) {
+        return Promise.reject(error);
+      }
       
-      // Redirect dynamically if not on login/register view
-      if (!window.location.pathname.includes('/login') && !window.location.pathname.includes('/register')) {
-        window.location.href = '/login?expired=true';
+      originalRequest._retry = true;
+      try {
+        const baseURL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api/v1';
+        const res = await axios.post(
+          `${baseURL}/auth/refresh-token`,
+          {},
+          { withCredentials: true }
+        );
+        
+        if (res.data?.success) {
+          const newToken = res.data.data?.token || res.data.token;
+          localStorage.setItem('token', newToken);
+          
+          // Update the Authorization header in the original request and retry it
+          originalRequest.headers.Authorization = `Bearer ${newToken}`;
+          return api(originalRequest);
+        }
+      } catch (refreshErr) {
+        console.error('Interrupted session refresh failed:', refreshErr.message);
+        // Clear local token and notify AuthContext
+        localStorage.removeItem('token');
+        window.dispatchEvent(new Event('auth-session-expired'));
       }
     }
-    
-    // Extract formatted message from API response
-    const apiError = (error.response && error.response.data && error.response.data.message)
-      || error.message
-      || 'Network request failure';
-      
-    return Promise.reject(new Error(apiError));
+    return Promise.reject(error);
   }
 );
 

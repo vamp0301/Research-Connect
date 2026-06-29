@@ -1,159 +1,243 @@
-import React, { useState } from 'react';
-import { useNavigate, Link, useSearchParams } from 'react-router-dom';
-import { Mail, Lock, LogIn, AlertCircle } from 'lucide-react';
-import Input from '@/components/common/Input.jsx';
-import Button from '@/components/common/Button.jsx';
-import api from '@/services/api.js';
+import React, { useState, useEffect } from 'react';
+import { useForm } from 'react-hook-form';
+import { useNavigate, Link } from 'react-router-dom';
+import { useAuth } from '../../context/AuthContext.jsx';
+import api from '../../services/api';
+import { Eye, EyeOff, Lock, Mail, Microscope, AlertCircle } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 
 const Login = () => {
+  const { login, syncProfile } = useAuth();
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
-  const isExpired = searchParams.get('expired') === 'true';
+  const [showPassword, setShowPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
-  const [formData, setFormData] = useState({
-    email: '',
-    password: '',
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+  } = useForm({
+    defaultValues: {
+      email: '',
+      password: '',
+    },
   });
 
-  const [errors, setErrors] = useState({});
-  const [isLoading, setIsLoading] = useState(false);
-  const [apiError, setApiError] = useState('');
-
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
-    if (errors[name]) {
-      setErrors((prev) => ({ ...prev, [name]: '' }));
-    }
-    setApiError('');
-  };
-
-  const validate = () => {
-    const tempErrors = {};
-    if (!formData.email) {
-      tempErrors.email = 'Email address is required';
-    } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
-      tempErrors.email = 'Please enter a valid email address';
-    }
-    if (!formData.password) {
-      tempErrors.password = 'Password is required';
-    } else if (formData.password.length < 8) {
-      tempErrors.password = 'Password must be at least 8 characters';
-    }
-    setErrors(tempErrors);
-    return Object.keys(tempErrors).length === 0;
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (!validate()) return;
-
-    setIsLoading(true);
-    setApiError('');
-
+  // Handle Google Sign-In response
+  const handleGoogleSignIn = async (response) => {
+    setLoading(true);
+    setError('');
     try {
-      // Attempt backend signin
-      const response = await api.post('/users/login', formData);
-      if (response && response.success) {
-        localStorage.setItem('token', response.data.token);
-        localStorage.setItem('user', JSON.stringify(response.data.user));
-        navigate('/');
+      const res = await api.post('/auth/google-login', { idToken: response.credential });
+      if (res.data?.success) {
+        localStorage.setItem('token', res.data.data.token);
+        // Sync profile details and redirect
+        await syncProfile();
+        navigate('/dashboard');
       }
     } catch (err) {
-      console.warn('⚠️ Backend login failed. Falling back to local offline sandbox mode...', err.message);
-      
-      // Local sandbox fallback for Phase 0 UI previewing
-      if (formData.email && formData.password) {
-        const mockUser = {
-          username: formData.email.split('@')[0],
-          email: formData.email,
-          role: 'researcher',
-        };
-        localStorage.setItem('token', 'mock_sandbox_jwt_token_key');
-        localStorage.setItem('user', JSON.stringify(mockUser));
-        navigate('/');
-      } else {
-        setApiError(err.message || 'Authentication failed');
-      }
+      console.error(err);
+      setError(err.response?.data?.message || 'Google Sign-In failed. Please try again.');
     } finally {
-      setIsLoading(false);
+      setLoading(false);
+    }
+  };
+
+  // Load Google Identity Services Script
+  useEffect(() => {
+    const script = document.createElement('script');
+    script.src = 'https://accounts.google.com/gsi/client';
+    script.async = true;
+    script.defer = true;
+    document.body.appendChild(script);
+
+    script.onload = () => {
+      if (window.google) {
+        window.google.accounts.id.initialize({
+          client_id: '959595325668-e5dlgoecao8lvo5k38plolvgv9ua2du1.apps.googleusercontent.com',
+          callback: handleGoogleSignIn,
+        });
+
+        window.google.accounts.id.renderButton(
+          document.getElementById('googleSignInBtn'),
+          { 
+            theme: 'outline', 
+            size: 'large', 
+            width: '100%',
+            text: 'signin_with',
+            shape: 'rectangular',
+          }
+        );
+      }
+    };
+
+    return () => {
+      document.body.removeChild(script);
+    };
+  }, []);
+
+  const onSubmit = async (data) => {
+    setLoading(true);
+    setError('');
+    try {
+      const res = await login(data.email, data.password);
+      if (res.success) {
+        const emailVerified = res.data?.emailVerified;
+        const otpRequired = res.data?.otpRequired;
+        
+        if (emailVerified === false) {
+          navigate(`/verify-email?email=${encodeURIComponent(data.email)}`);
+        } else if (otpRequired) {
+          navigate(`/verify-otp?email=${encodeURIComponent(data.email)}`);
+        }
+      }
+    } catch (err) {
+      console.error(err);
+      setError(err.response?.data?.message || 'Invalid email or password. Please try again.');
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
-    <div className="flex flex-col gap-6 text-left">
-      <div className="text-center sm:text-left">
-        <h3 className="text-xl font-bold font-display text-[var(--color-brand-text-primary)]">Welcome Back</h3>
-        <p className="text-xs text-[var(--color-brand-text-secondary)] mt-1">Sign in to coordinate and view research studies</p>
-      </div>
-
-      {isExpired && (
-        <div className="flex items-center gap-2 p-3 bg-[var(--color-brand-light-orange)] border border-amber-200 text-[var(--color-brand-orange)] rounded-xl text-xs">
-          <AlertCircle className="w-4 h-4 flex-shrink-0" />
-          <span>Session expired. Please log in again to continue.</span>
-        </div>
-      )}
-
-      {apiError && (
-        <div className="flex items-center gap-2 p-3 bg-[var(--color-brand-red)]/10 border border-[var(--color-brand-red)]/35 text-[var(--color-brand-red)] rounded-xl text-xs">
-          <AlertCircle className="w-4 h-4 flex-shrink-0" />
-          <span>{apiError}</span>
-        </div>
-      )}
-
-      <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-        <div className="relative">
-          <Input
-            label="Email Address"
-            type="email"
-            name="email"
-            value={formData.email}
-            onChange={handleChange}
-            error={errors.email}
-            placeholder="name@institution.edu"
-            required
-            className="pl-10"
-          />
-          <Mail className="absolute left-3.5 bottom-3.5 w-4 h-4 text-slate-500" />
-        </div>
-
-        <div className="relative">
-          <Input
-            label="Password"
-            type="password"
-            name="password"
-            value={formData.password}
-            onChange={handleChange}
-            error={errors.password}
-            placeholder="••••••••"
-            required
-            className="pl-10"
-          />
-          <Lock className="absolute left-3.5 bottom-3.5 w-4 h-4 text-slate-500" />
-        </div>
-
-        <div className="flex items-center justify-between text-xs mt-1">
-          <label className="flex items-center gap-2 text-[var(--color-brand-text-secondary)] cursor-pointer">
-            <input type="checkbox" className="rounded bg-white border-[var(--color-brand-border)] text-[var(--color-brand-blue)] focus:ring-0 focus:ring-offset-0 cursor-pointer" />
-            Remember me
-          </label>
-          <a href="#" className="text-[var(--color-brand-blue)] hover:underline">Forgot password?</a>
-        </div>
-
-        <Button type="submit" isLoading={isLoading} className="w-full mt-2">
-          Sign In <LogIn className="w-4 h-4 ml-2" />
-        </Button>
-      </form>
-
-      <div className="border-t border-[var(--color-brand-border)] pt-4 text-center">
-        <p className="text-xs text-[var(--color-brand-text-secondary)]">
-          Don&apos;t have an account?{' '}
-          <Link to="/register" className="text-[var(--color-brand-blue)] hover:underline font-semibold">
-            Create account
-          </Link>
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5 }}
+      className="space-y-6"
+    >
+      {/* Header */}
+      <div className="text-center space-y-1.5">
+        <h2 className="text-2xl font-extrabold text-slate-900 tracking-tight font-display">
+          Welcome Back
+        </h2>
+        <p className="text-sm text-slate-500">
+          Access your professional research dashboard.
         </p>
       </div>
-    </div>
+
+      {/* Error Alert */}
+      <AnimatePresence>
+        {error && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+            className="p-3.5 bg-red-50/75 border border-red-100 text-red-700 rounded-xl text-xs font-medium flex items-start gap-2.5"
+          >
+            <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0 text-red-500" />
+            <span>{error}</span>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Google Login Button Container */}
+      <div className="space-y-4">
+        <div className="w-full flex justify-center" id="googleSignInBtn"></div>
+        
+        {/* Divider */}
+        <div className="relative flex py-2 items-center">
+          <div className="flex-grow border-t border-slate-100"></div>
+          <span className="flex-shrink mx-4 text-xs text-slate-400 font-medium uppercase tracking-wider">
+            or sign in with email
+          </span>
+          <div className="flex-grow border-t border-slate-100"></div>
+        </div>
+      </div>
+
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+        {/* Email Field */}
+        <div className="space-y-1.5 text-left">
+          <label className="text-xs font-semibold text-slate-500 tracking-wider uppercase pl-1">
+            Work Email
+          </label>
+          <div className="relative">
+            <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+            <input
+              type="email"
+              placeholder="you@institution.edu"
+              {...register('email', {
+                required: 'Email address is required',
+                pattern: {
+                  value: /^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,3})+$/,
+                  message: 'Please enter a valid email address',
+                },
+              })}
+              className={`w-full pl-11 pr-4 py-2.5 bg-slate-50 border ${
+                errors.email ? 'border-red-300 focus:ring-red-200/50 focus:border-red-500' : 'border-slate-200/85 focus:ring-blue-100/50 focus:border-blue-500'
+              } rounded-xl text-sm transition-all focus:outline-none focus:ring-4`}
+            />
+          </div>
+          {errors.email && (
+            <p className="text-xs text-red-500 font-medium pl-1">{errors.email.message}</p>
+          )}
+        </div>
+
+        {/* Password Field */}
+        <div className="space-y-1.5 text-left">
+          <div className="flex items-center justify-between px-1">
+            <label className="text-xs font-semibold text-slate-500 tracking-wider uppercase">
+              Password
+            </label>
+            <Link
+              to="/forgot-password"
+              className="text-xs font-semibold text-blue-600 hover:text-blue-700 transition-colors"
+            >
+              Forgot Password?
+            </Link>
+          </div>
+          <div className="relative">
+            <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+            <input
+              type={showPassword ? 'text' : 'password'}
+              placeholder="••••••••"
+              {...register('password', { required: 'Password is required' })}
+              className={`w-full pl-11 pr-11 py-2.5 bg-slate-50 border ${
+                errors.password ? 'border-red-300 focus:ring-red-200/50 focus:border-red-500' : 'border-slate-200/85 focus:ring-blue-100/50 focus:border-blue-500'
+              } rounded-xl text-sm transition-all focus:outline-none focus:ring-4`}
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword(!showPassword)}
+              className="absolute right-3.5 top-1/2 -translate-y-1/2 p-1 hover:bg-slate-100 text-slate-400 hover:text-slate-600 rounded-lg transition-colors"
+            >
+              {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+            </button>
+          </div>
+          {errors.password && (
+            <p className="text-xs text-red-500 font-medium pl-1">{errors.password.message}</p>
+          )}
+        </div>
+
+        {/* Submit Button */}
+        <button
+          type="submit"
+          disabled={loading}
+          className="w-full py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white rounded-xl text-sm font-semibold transition-all shadow-md shadow-blue-500/10 hover:shadow-blue-500/20 active:scale-[0.99] flex items-center justify-center gap-2 cursor-pointer"
+        >
+          {loading ? (
+            <>
+              <div className="w-4.5 h-4.5 border-2 border-white/25 border-t-white rounded-full animate-spin"></div>
+              <span>Signing in...</span>
+            </>
+          ) : (
+            <span>Sign In</span>
+          )}
+        </button>
+      </form>
+
+      {/* Register Link */}
+      <div className="text-center text-sm text-slate-500 border-t border-slate-100 pt-4">
+        New to ResearchConnect?{' '}
+        <Link
+          to="/register"
+          className="font-semibold text-blue-600 hover:text-blue-700 transition-colors"
+        >
+          Create an account
+        </Link>
+      </div>
+    </motion.div>
   );
 };
 
