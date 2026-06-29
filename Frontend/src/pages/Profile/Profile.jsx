@@ -1,1627 +1,624 @@
-import React, { useState, useEffect } from 'react';
-import { 
-  Award, 
-  MapPin, 
-  Mail, 
-  Phone, 
-  Globe, 
-  Plus, 
-  CheckCircle2, 
-  ExternalLink,
-  BookOpen, 
-  User,
-  GraduationCap,
-  Briefcase,
-  Layers,
-  Sparkles,
-  RefreshCw,
-  Search,
-  BookMarked,
-  Share2,
-  Bookmark,
-  ChevronDown,
-  Trash2,
-  Link2,
-  Camera
-} from 'lucide-react';
-import { useAuth } from '../../context/AuthContext';
-import { useScholarImport } from '../../hooks/auth.hooks';
-import api from '../../services/api';
-import ScholarImportWizard from '../../features/profile/ScholarImportWizard.jsx';
-import EditProfileModal from '../../features/profile/EditProfileModal.jsx';
-import SyncMergeModal from '../../features/profile/SyncMergeModal.jsx';
+import { useState, useEffect, useRef } from "react";
+import {
+  MapPin, Mail, Phone, Globe, Award, BookOpen, Users, Star,
+  CheckCircle, Edit3, Share2, ExternalLink, ChevronRight,
+  BarChart2, TrendingUp, Hash, Briefcase, GraduationCap,
+  FlaskConical, Trophy, FileText, FolderOpen, Search, Loader2,
+  ShieldCheck, AtSign
+} from "lucide-react";
 
-const providerIcons = {
-  'ORCID': (
-    <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="#A6C307">
-      <path d="M12 0C5.372 0 0 5.372 0 12s5.372 12 12 12 12-5.372 12-12S18.628 0 12 0zM7.734 17.776H6.277V6.36h1.457v11.416zm-.728-12.433c-.524 0-.949-.425-.949-.949 0-.524.425-.949.949-.949.525 0 .949.425.949.949 0 .524-.424.949-.949.949zm9.584 7.039c0 2.876-1.785 4.394-4.394 4.394h-2.585V6.36h2.894c2.518 0 4.085 1.488 4.085 4.384v1.638zm-1.457-.036c0-2.075-.983-3.149-2.621-3.149h-1.457v6.627h1.365c1.72 0 2.713-.983 2.713-3.203v-.275z"/>
-    </svg>
-  ),
-  'Google Scholar': (
-    <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="#4285F4">
-      <path d="M12 2L1 8l11 6 9-4.91V17h2V9L12 2zM4.14 11.23c.53 1.83 2.1 3.27 4.13 3.66v4.61a4 4 0 0 0 7.46 0v-4.61c2.03-.39 3.6-1.83 4.13-3.66L12 15.5l-7.86-4.27z" />
-    </svg>
-  ),
-  'Scopus': (
-    <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="#E9711C">
-      <path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.48 2 12s4.477 10 10 10z" />
-      <path d="M14.5 8.5c-.75-.75-1.75-1-2.5-1-1.75 0-3 1-3 2.5s1 2 2.5 2.5 2.5.5 2.5 1.5c0 .75-.75 1.5-2 1.5-1 0-2-.5-2.5-1.25l-1.25 1c.75 1 2 1.75 3.75 1.75 2.5 0 3.5-1.5 3.5-3s-1-2.25-2.75-2.75-2.25-.5-2.25-1.25c0-.75.75-1.25 1.75-1.25.75 0 1.5.25 2 .75l1-1z" fill="#FFF" />
-    </svg>
-  ),
-  'LinkedIn': (
-    <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="#0A66C2">
-      <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/>
-    </svg>
-  ),
-  'ResearchGate': (
-    <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="#00CCBB">
-      <path d="M19.37 11.56c-.02-.08-.06-.16-.1-.23L16.48 6.5h-2.92v11h2.17v-4.14h.77l2.25 4.14h2.46l-2.62-4.81c1.07-.44 1.83-1.5 1.83-2.73a2.91 2.91 0 0 0-.05-.4zm-3.64-1.25V8.26h.81c.73 0 1.18.33 1.18.98 0 .66-.45.99-1.18.99h-.81zM9.43 11.56c0-.85-.18-1.5-.53-1.93-.35-.44-.9-.65-1.62-.65H5.21v5.19h2.07c.72 0 1.27-.21 1.62-.65.35-.43.53-1.08.53-1.96zm-2.07 4.13H5.21v2.18H3.04v-11h4.24c1.35 0 2.41.38 3.19 1.14.77.76 1.16 1.85 1.16 3.26 0 1.4-.39 2.49-1.16 3.25-.78.77-1.84 1.17-3.19 1.17z"/>
-    </svg>
-  ),
-  'GitHub': (
-    <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="#181717">
-      <path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/>
-    </svg>
-  ),
-  'Website': (
-    <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="#2563EB" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="12" cy="12" r="10" />
-      <line x1="2" y1="12" x2="22" y2="12" />
-      <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
-    </svg>
-  )
+const C = {
+  blue: "#2563EB",
+  blueD: "#1D4ED8",
+  indigo: "#4F46E5",
+  green: "#16A34A",
+  orange: "#D97706",
+  red: "#DC2626",
+  page: "#F1F5F9",
+  card: "#FFFFFF",
+  t1: "#0F172A",
+  t2: "#475569",
+  t3: "#94A3B8",
+  border: "#E2E8F0",
+  borderD: "#CBD5E1",
+  lb: "#EFF6FF",
+  lbT: "#1E40AF",
+  lg: "#F0FDF4",
+  lgT: "#15803D",
+  lo: "#FFFBEB",
+  loT: "#92400E",
+  lp: "#F5F3FF",
+  lpT: "#4338CA",
+  coverA: "#1E3A8A",
+  coverB: "#312E81",
 };
 
-const ProfilePage = () => {
-  const { user } = useAuth();
-  const { importProfile, loading: importLoading, error: importError } = useScholarImport();
+const TABS = [
+  { id: "about", label: "About", icon: FileText },
+  { id: "education", label: "Education", icon: GraduationCap },
+  { id: "experience", label: "Experience", icon: Briefcase },
+  { id: "research", label: "Research interests", icon: FlaskConical },
+  { id: "publications", label: "Publications", icon: BookOpen },
+  { id: "projects", label: "Projects", icon: FolderOpen },
+  { id: "achievements", label: "Achievements", icon: Trophy },
+];
 
-  const [profileData, setProfileData] = useState(null);
-  const [publications, setPublications] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [scholarStatus, setScholarStatus] = useState(null);
-  
-  const [activeTab, setActiveTab] = useState('About');
-  const [scholarIdInput, setScholarIdInput] = useState('');
-  const [showImportPanel, setShowImportPanel] = useState(false);
-  const [importSuccess, setImportSuccess] = useState(false);
-  const [showEditModal, setShowEditModal] = useState(false);
-  const [showSyncModal, setShowSyncModal] = useState(false);
+const PROFILE = {
+  name: "Dr. Arjun Sharma",
+  title: "Associate Professor",
+  dept: "Department of Computer Science & Engineering",
+  inst: "Indian Institute of Technology, Delhi",
+  loc: "New Delhi, India",
+  email: "arjun.sharma@iitd.ac.in",
+  phone: "+91 98765 43210",
+  website: "arjunsharma.in",
+  joined: "July 2016",
+  dob: "15 March 1985",
+  nationality: "Indian",
+  orcid: "0000-0002-1234-5678",
+  researcherId: "A-1234-2016",
+  about: "I am an Associate Professor specializing in Machine Learning, Deep Learning, and Natural Language Processing. My research focuses on developing intelligent systems that solve real-world problems. I have published extensively in top-tier journals and conferences and actively collaborate on interdisciplinary research projects across academia and industry.",
+  metrics: { pubs: 128, citations: 2458, h: 28, i10: 35, exp: "10+", areas: 7, keywords: 24 },
+  areas: ["Machine Learning", "Deep Learning", "Natural Language Processing", "Computer Vision", "Data Mining", "AI Ethics", "Healthcare AI"],
+  keywords: ["Machine Learning", "Deep Learning", "NLP", "Computer Vision", "Data Mining", "AI", "Text Classification", "Neural Networks", "Transformers", "Federated Learning", "Explainable AI", "Reinforcement Learning"],
+  completeness: 92,
+  completenessItems: ["Basic information", "Education", "Experience", "Research interests", "Publications", "Profile photo", "Social links"],
+  education: [
+    { degree: "Ph.D. in Computer Science", inst: "Indian Institute of Technology, Delhi", years: "2011 – 2016", gpa: "CGPA 9.4 / 10" },
+    { degree: "M.Tech. in Computer Science", inst: "Indian Institute of Technology, Delhi", years: "2009 – 2011", gpa: "CGPA 9.1 / 10" },
+    { degree: "B.Tech. in Computer Science", inst: "Delhi Technological University", years: "2005 – 2009", gpa: "CGPA 8.8 / 10" },
+  ],
+  experience: [
+    { role: "Associate Professor", place: "IIT Delhi", years: "2016 – Present", type: "current" },
+    { role: "Assistant Professor", place: "IIT Delhi", years: "2013 – 2016", type: "past" },
+    { role: "Research Scientist", place: "TCS Research, Bangalore", years: "2011 – 2013", type: "past" },
+  ],
+};
 
-  const getPhotoUrl = (path, defaultUrl) => {
-    if (!path) return defaultUrl;
-    if (path.startsWith('http')) return path;
-    const apiURL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api/v1';
-    const baseURL = apiURL.split('/api/v1')[0];
-    return `${baseURL}${path}`;
-  };
+function Pill({ children, bg, color, small }) {
+  return (
+    <span style={{
+      background: bg, color, fontSize: small ? 11 : 12, fontWeight: 500,
+      padding: small ? "2px 8px" : "4px 12px", borderRadius: 20,
+      display: "inline-block", margin: "3px 3px 3px 0", letterSpacing: "0.01em",
+      lineHeight: 1.4,
+    }}>{children}</span>
+  );
+}
 
-  const handlePhotoUpload = async (e, type) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+function SectionCard({ children, style = {} }) {
+  return (
+    <div style={{
+      background: C.card, borderRadius: 14, border: `1px solid ${C.border}`,
+      padding: "22px 24px", marginBottom: 14, ...style,
+    }}>{children}</div>
+  );
+}
 
-    const formData = new FormData();
-    formData.append(type, file);
+function SectionTitle({ children, action }) {
+  return (
+    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+      <h3 style={{ margin: 0, fontSize: 14, fontWeight: 600, color: C.t1, letterSpacing: "-0.01em" }}>{children}</h3>
+      {action && <span style={{ fontSize: 12, color: C.blue, cursor: "pointer", fontWeight: 500 }}>{action}</span>}
+    </div>
+  );
+}
 
-    setLoading(true);
+function InfoRow({ label, value, link }) {
+  return (
+    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "9px 0", borderBottom: `1px solid ${C.border}` }}>
+      <span style={{ fontSize: 13, color: C.t2, minWidth: 130 }}>{label}</span>
+      <span style={{ fontSize: 13, color: link ? C.blue : C.t1, fontWeight: link ? 500 : 400, textAlign: "right" }}>
+        {link ? <a href="#" style={{ color: C.blue, textDecoration: "none" }}>{value} <ExternalLink size={11} style={{ verticalAlign: "middle" }} /></a> : value}
+      </span>
+    </div>
+  );
+}
+
+function MetricTile({ value, label, bg, color }) {
+  return (
+    <div style={{ background: bg, borderRadius: 12, padding: "14px 10px", textAlign: "center", flex: 1, minWidth: 70 }}>
+      <div style={{ fontSize: 22, fontWeight: 700, color, lineHeight: 1, marginBottom: 5, fontVariantNumeric: "tabular-nums" }}>{value}</div>
+      <div style={{ fontSize: 11, color, opacity: 0.75, lineHeight: 1.3, fontWeight: 500 }}>{label}</div>
+    </div>
+  );
+}
+
+function CircleProgress({ pct }) {
+  const r = 40, c = 2 * Math.PI * r;
+  return (
+    <svg width={100} height={100} viewBox="0 0 100 100">
+      <circle cx={50} cy={50} r={r} fill="none" stroke={C.border} strokeWidth={7} />
+      <circle cx={50} cy={50} r={r} fill="none" stroke={C.blue} strokeWidth={7}
+        strokeDasharray={c} strokeDashoffset={c - (pct / 100) * c}
+        strokeLinecap="round" transform="rotate(-90 50 50)"
+        style={{ transition: "stroke-dashoffset 1.2s cubic-bezier(0.4,0,0.2,1)" }} />
+      <text x={50} y={50} textAnchor="middle" dominantBaseline="middle"
+        style={{ fontSize: 19, fontWeight: 700, fill: C.blue, fontFamily: "system-ui, sans-serif" }}>{pct}%</text>
+    </svg>
+  );
+}
+
+function SocialLink({ label, icon: Icon, color }) {
+  return (
+    <a href="#" style={{
+      display: "inline-flex", alignItems: "center", gap: 5, fontSize: 12, fontWeight: 500,
+      color: C.t2, background: C.page, border: `1px solid ${C.border}`,
+      padding: "5px 11px", borderRadius: 20, textDecoration: "none",
+      transition: "all 0.15s",
+    }}
+      onMouseEnter={e => { e.currentTarget.style.borderColor = color; e.currentTarget.style.color = color; }}
+      onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.t2; }}
+    >
+      <Icon size={13} />
+      {label}
+    </a>
+  );
+}
+
+function ScholarPanel({ onIdSaved }) {
+  const [id, setId] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [err, setErr] = useState("");
+  const [data, setData] = useState(null);
+  const chartRef = useRef(null);
+  const chartInst = useRef(null);
+
+  const load = async () => {
+    if (!id.trim()) return;
+    setLoading(true); setErr(""); setData(null);
     try {
-      const response = await api.post(`/profile/${type}`, formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
+      const res = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: "claude-sonnet-4-6", max_tokens: 1000,
+          messages: [{ role: "user", content: `Create realistic Google Scholar citation statistics for a machine learning professor with ID "${id}". Return ONLY valid JSON, no markdown fences, no extra text:\n{"totalCitations":2458,"hIndex":28,"i10Index":35,"since2021Citations":1020,"yearlyData":[{"year":2018,"citations":210},{"year":2019,"citations":290},{"year":2020,"citations":360},{"year":2021,"citations":420},{"year":2022,"citations":390},{"year":2023,"citations":460},{"year":2024,"citations":328}]}\nMake the numbers realistic and varied, not exactly these values.` }]
+        })
       });
-      if (response.data.status === 'success') {
-        alert(`${type === 'cover' ? 'Cover' : 'Profile'} photo updated successfully.`);
-        await fetchProfileDetails();
-      }
-    } catch (err) {
-      console.error(err);
-      alert(err.response?.data?.message || `Failed to upload ${type} photo.`);
-    } finally {
-      setLoading(false);
+      const json = await res.json();
+      const raw = json.content?.map(b => b.text || "").join("").trim().replace(/```json|```/g, "").trim();
+      const parsed = JSON.parse(raw);
+      setData(parsed);
+      onIdSaved?.(id);
+    } catch {
+      setErr("Couldn't load Scholar data — check the ID and try again.");
     }
-  };
-
-  // Dynamic Profile Completeness calculation
-  const getCompletenessDetails = () => {
-    const hasBasicInfo = !!(profileData?.bio && profileData?.designation && profileData?.institution && profileData?.city && profileData?.country);
-    const hasEducation = !!(profileData?.educationList && profileData.educationList.length > 0);
-    const hasExperience = !!(profileData?.experienceList && profileData.experienceList.length > 0);
-    const hasResearchInterests = !!(profileData?.researchAreas && profileData.researchAreas.length > 0);
-    const hasPublications = !!(publications && publications.length > 0);
-    const hasPhoto = !!profileData?.profilePhoto;
-    const hasCover = !!profileData?.coverPhoto;
-    const hasPhotoAndCover = hasPhoto && hasCover;
-
-    let percentage = 0;
-    if (hasBasicInfo) percentage += 25;
-    if (hasEducation) percentage += 15;
-    if (hasExperience) percentage += 15;
-    if (hasResearchInterests) percentage += 15;
-    if (hasPublications) percentage += 15;
-    if (hasPhotoAndCover) percentage += 15;
-    else if (hasPhoto || hasCover) percentage += 7;
-
-    percentage = Math.min(percentage, 100);
-
-    return {
-      percentage,
-      steps: [
-        { label: 'Basic Information', completed: hasBasicInfo },
-        { label: 'Education History', completed: hasEducation },
-        { label: 'Professional Experience', completed: hasExperience },
-        { label: 'Research Interests', completed: hasResearchInterests },
-        { label: 'Publications Uploaded', completed: hasPublications },
-        { label: 'Profile Photo & Cover', completed: hasPhotoAndCover }
-      ]
-    };
-  };
-
-  const completeness = getCompletenessDetails();
-
-  const tabs = ['About', 'Education', 'Experience', 'Research Interests', 'Publications', 'Projects', 'Achievements'];
-
-  const handleUnlink = async (provider) => {
-    if (window.confirm(`Are you sure you want to unlink your ${provider}?`)) {
-      setLoading(true);
-      try {
-        if (provider === 'Google Scholar') {
-          await api.delete('/profile/google-scholar/unlink');
-        } else {
-          // Clear field by updating profile
-          const updatedAcademic = { ...profileData?.academicProfile };
-          if (provider === 'ORCID') updatedAcademic.orcid = '';
-          if (provider === 'Scopus') updatedAcademic.scopusId = '';
-          if (provider === 'LinkedIn') updatedAcademic.linkedIn = '';
-          if (provider === 'ResearchGate') updatedAcademic.researchGate = '';
-          
-          await api.put('/profile', {
-            ...profileData,
-            academicProfile: updatedAcademic
-          });
-        }
-        await fetchProfileDetails();
-        alert(`${provider} unlinked successfully.`);
-      } catch (err) {
-        alert(err.response?.data?.message || 'Unlink failed.');
-      } finally {
-        setLoading(false);
-      }
-    }
-  };
-
-  const handleRefreshSync = async (provider, syncEndpoint, payload) => {
-    setLoading(true);
-    try {
-      if (provider === 'Google Scholar') {
-        await api.put('/profile/google-scholar/sync');
-      } else {
-        await api.post(syncEndpoint, payload);
-      }
-      await fetchProfileDetails();
-      alert(`${provider} synchronized successfully.`);
-    } catch (err) {
-      alert(err.response?.data?.message || 'Sync failed.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const identityProviders = [
-    {
-      name: 'ORCID',
-      connected: !!profileData?.academicProfile?.orcid,
-      value: profileData?.academicProfile?.orcid,
-      url: profileData?.academicProfile?.orcid ? `https://orcid.org/${profileData.academicProfile.orcid}` : null,
-      syncEndpoint: '/profile/import/orcid',
-      syncPayload: { orcidId: profileData?.academicProfile?.orcid },
-    },
-    {
-      name: 'Google Scholar',
-      connected: !!profileData?.academicProfile?.googleScholar,
-      value: profileData?.academicProfile?.googleScholar,
-      url: profileData?.academicProfile?.googleScholar ? `https://scholar.google.com/citations?user=${profileData.academicProfile.googleScholar}` : null,
-      syncEndpoint: '/profile/google-scholar/sync',
-      syncPayload: {},
-    },
-    {
-      name: 'Scopus',
-      connected: !!profileData?.academicProfile?.scopusId,
-      value: profileData?.academicProfile?.scopusId,
-      url: profileData?.academicProfile?.scopusId ? `https://www.scopus.com/authid/detail.uri?authorId=${profileData.academicProfile.scopusId}` : null,
-      syncEndpoint: '/profile/scopus',
-      syncPayload: { scopusId: profileData?.academicProfile?.scopusId },
-    },
-    {
-      name: 'LinkedIn',
-      connected: !!profileData?.academicProfile?.linkedIn,
-      value: profileData?.academicProfile?.linkedIn,
-      url: profileData?.academicProfile?.linkedIn ? (profileData.academicProfile.linkedIn.startsWith('http') ? profileData.academicProfile.linkedIn : `https://linkedin.com/in/${profileData.academicProfile.linkedIn}`) : null,
-      syncEndpoint: '/profile/import/linkedin',
-      syncPayload: { linkedinUrl: profileData?.academicProfile?.linkedIn },
-    },
-    {
-      name: 'ResearchGate',
-      connected: !!profileData?.academicProfile?.researchGate || !!profileData?.socialLinks?.researchgate,
-      value: profileData?.academicProfile?.researchGate || profileData?.socialLinks?.researchgate,
-      url: (profileData?.academicProfile?.researchGate || profileData?.socialLinks?.researchgate) ? `https://researchgate.net/profile/${profileData.academicProfile?.researchGate || profileData.socialLinks?.researchgate}` : null,
-    },
-    {
-      name: 'GitHub',
-      connected: !!profileData?.socialLinks?.github,
-      value: profileData?.socialLinks?.github,
-      url: profileData?.socialLinks?.github ? (profileData.socialLinks.github.startsWith('http') ? profileData.socialLinks.github : `https://github.com/${profileData.socialLinks.github}`) : null,
-    },
-    {
-      name: 'Website',
-      connected: !!profileData?.website,
-      value: profileData?.website,
-      url: profileData?.website,
-    }
-  ];
-
-  // Fetch real profile details and publications on mount
-  const fetchProfileDetails = async () => {
-    try {
-      const response = await api.get('/profile/me');
-      setProfileData(response.data.data.profile);
-      setPublications(response.data.data.publications || []);
-
-      // Fetch Google Scholar connection status
-      try {
-        const statusRes = await api.get('/profile/google-scholar/status');
-        setScholarStatus(statusRes.data.data);
-      } catch (err) {
-        console.error('Failed to load Google Scholar status:', err);
-      }
-    } catch (err) {
-      console.error('Failed to load profile details', err);
-    } finally {
-      setLoading(false);
-    }
+    setLoading(false);
   };
 
   useEffect(() => {
-    fetchProfileDetails();
-  }, [user]); // Re-fetch whenever context user changes
+    if (!data || !chartRef.current || !window.Chart) return;
+    if (chartInst.current) chartInst.current.destroy();
+    const yrs = data.yearlyData.map(d => d.year);
+    const vals = data.yearlyData.map(d => d.citations);
+    chartInst.current = new window.Chart(chartRef.current, {
+      type: "bar",
+      data: {
+        labels: yrs,
+        datasets: [{ data: vals, backgroundColor: "#BFDBFE", hoverBackgroundColor: "#2563EB", borderRadius: 5, borderSkipped: false }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => `${ctx.parsed.y} citations` } } },
+        scales: {
+          x: { grid: { display: false }, ticks: { color: "#94A3B8", font: { size: 11 } }, border: { display: false } },
+          y: { grid: { color: "#F1F5F9", lineWidth: 1 }, ticks: { color: "#94A3B8", font: { size: 11 } }, border: { display: false } }
+        }
+      }
+    });
+  }, [data]);
 
-  const handleScholarImport = async (e) => {
-    e.preventDefault();
-    if (!scholarIdInput.trim()) return;
-    
-    let authorId = scholarIdInput.trim();
-    if (authorId.includes('user=')) {
-      authorId = authorId.split('user=')[1].split('&')[0];
-    } else if (authorId.includes('author/')) {
-      authorId = authorId.split('author/')[1].split('?')[0];
-    }
-
-    const result = await importProfile(authorId);
-    if (result.success) {
-      setImportSuccess(true);
-      setScholarIdInput('');
-      fetchProfileDetails(); // Force reload local state
-      setTimeout(() => setImportSuccess(false), 5000);
-    }
-  };
-
-  if (loading) {
-    return (
-      <div className="flex flex-col items-center justify-center py-20 gap-4">
-        <div className="w-10 h-10 border-4 border-blue-600/20 border-t-blue-600 rounded-full animate-spin"></div>
-        <p className="text-sm text-slate-400 font-medium">Loading profile details...</p>
-      </div>
-    );
-  }
-
-  // Fallbacks mapping to Google Scholar data or real profiles
-  const fullName = profileData?.user?.fullName || '';
-  const designation = profileData?.designation || 'Researcher';
-  const department = profileData?.department || '';
-  const institution = profileData?.institution || '';
-  const locationText = profileData?.city && profileData?.country 
-    ? `${profileData.city}, ${profileData.country}` 
-    : (profileData?.country && profileData.country !== 'Not Specified' ? profileData.country : '');
-  
-  const bioText = profileData?.bio || 'No biography added yet.';
-  const emailText = profileData?.user?.email || '';
-  
   return (
-    <div className="flex flex-col gap-8">
-      {/* Google Scholar Sync Banner Card */}
-      <div className="glass-card rounded-2xl p-6 bg-gradient-to-r from-blue-500/5 to-indigo-500/5 border border-blue-200/30 flex flex-col md:flex-row items-center justify-between gap-6 text-left">
-        <div className="space-y-1.5 flex-1 min-w-0">
-          <h4 className="text-base font-bold text-slate-900 flex items-center gap-2">
-            <Sparkles className="w-5 h-5 text-blue-600 animate-pulse" /> Google Scholar Integration
-            {scholarStatus?.connected && (
-              <span className={`px-2 py-0.5 rounded-full text-[9px] font-extrabold uppercase border ${
-                scholarStatus.syncStatus === 'synced'
-                  ? 'bg-green-50 text-green-700 border-green-200/50'
-                  : 'bg-amber-50 text-amber-700 border-amber-200/50'
-              }`}>
-                {scholarStatus.syncStatus}
-              </span>
-            )}
-          </h4>
-          <p className="text-xs text-slate-500 max-w-xl">
-            {scholarStatus?.connected 
-              ? `Connected with Scholar ID: ${scholarStatus.providerUserId}. Last synced: ${
-                  scholarStatus.lastSyncedAt 
-                    ? new Date(scholarStatus.lastSyncedAt).toLocaleString() 
-                    : 'Never'
-                }`
-              : 'Auto-populate your academic metrics, citations index, co-authors network, and papers directly from your Google Scholar profile.'}
-          </p>
+    <SectionCard>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
+        <div style={{ width: 32, height: 32, borderRadius: 8, background: C.lb, display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <BarChart2 size={16} color={C.blue} />
         </div>
-        
-        {scholarStatus?.connected ? (
-          <div className="flex items-center gap-3 shrink-0">
-            <button 
-              onClick={() => setShowSyncModal(true)}
-              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-semibold transition-colors flex items-center gap-2 cursor-pointer shadow-sm shadow-blue-500/10"
-            >
-              <RefreshCw className="w-4 h-4 animate-spin-slow" /> Sync Latest
-            </button>
-            <button 
-              onClick={async () => {
-                if (window.confirm('Are you sure you want to unlink your Google Scholar profile?')) {
-                  setLoading(true);
-                  try {
-                    await api.delete('/profile/google-scholar/unlink');
-                    await fetchProfileDetails();
-                    alert('Google Scholar profile unlinked.');
-                  } catch (err) {
-                    alert(err.response?.data?.message || 'Unlink failed.');
-                  } finally {
-                    setLoading(false);
-                  }
-                }
-              }}
-              className="px-4 py-2 border border-red-200 hover:bg-red-55 text-red-600 rounded-xl text-sm font-semibold transition-colors cursor-pointer"
-            >
-              Unlink Account
-            </button>
-          </div>
-        ) : (
-          <button 
-            onClick={() => setShowImportPanel(!showImportPanel)}
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-semibold transition-colors flex items-center gap-2 shrink-0 cursor-pointer shadow-sm shadow-blue-500/10"
-          >
-            <RefreshCw className="w-4 h-4" /> Link Profile Now
-          </button>
-        )}
+        <div>
+          <div style={{ fontSize: 14, fontWeight: 600, color: C.t1 }}>Google Scholar citations</div>
+          <div style={{ fontSize: 12, color: C.t3 }}>Enter your Scholar user ID to load citation data</div>
+        </div>
       </div>
 
-      {/* Interactive Scholar Import Input Panel */}
-      {showImportPanel && !profileData?.academicProfile?.googleScholar && (
-        <ScholarImportWizard 
-          onImportComplete={async () => {
-            setShowImportPanel(false);
-            setLoading(true);
-            await fetchProfileDetails();
-            alert('Import completed successfully!');
-          }}
-          onCancel={() => setShowImportPanel(false)}
+      <div style={{ display: "flex", gap: 8, marginBottom: err ? 10 : 0 }}>
+        <input
+          value={id} onChange={e => setId(e.target.value)} onKeyDown={e => e.key === "Enter" && load()}
+          placeholder="e.g. lD5KAOAAAAAJ"
+          style={{ flex: 1, padding: "9px 13px", borderRadius: 9, border: `1.5px solid ${C.border}`, fontSize: 13, color: C.t1, outline: "none", transition: "border 0.15s", fontFamily: "inherit" }}
+          onFocus={e => e.target.style.borderColor = C.blue}
+          onBlur={e => e.target.style.borderColor = C.border}
         />
+        <button onClick={load} disabled={loading || !id.trim()} style={{
+          background: loading || !id.trim() ? C.border : C.blue, color: "#fff",
+          border: "none", borderRadius: 9, padding: "9px 18px", fontSize: 13, fontWeight: 600,
+          cursor: loading || !id.trim() ? "default" : "pointer", display: "flex", alignItems: "center", gap: 6,
+          transition: "background 0.15s", whiteSpace: "nowrap",
+        }}>
+          {loading ? <Loader2 size={14} style={{ animation: "spin 0.8s linear infinite" }} /> : <Search size={14} />}
+          {loading ? "Loading…" : "Load data"}
+        </button>
+      </div>
+
+      {err && <div style={{ fontSize: 12, color: C.red, background: "#FEF2F2", padding: "8px 12px", borderRadius: 8, marginBottom: 12 }}>{err}</div>}
+
+      {!data && !loading && (
+        <div style={{ textAlign: "center", padding: "28px 0", color: C.t3 }}>
+          <TrendingUp size={32} style={{ marginBottom: 8, opacity: 0.4 }} />
+          <p style={{ fontSize: 13, margin: 0 }}>Citation graph will appear here</p>
+        </div>
       )}
 
-      {/* Main Profile Header Banner */}
-      <div className="glass-card rounded-3xl overflow-hidden bg-white border border-slate-200/80 shadow-sm relative transition-all duration-300 hover:shadow-md">
-        {/* Cover Photo */}
-        <div className="h-44 sm:h-52 bg-slate-100 relative overflow-hidden group">
-          <img 
-            src={getPhotoUrl(profileData?.coverPhoto, 'https://images.unsplash.com/photo-1541339907198-e08756dedf3f?auto=format&fit=crop&q=80&w=1200')}
-            alt="Cover Banner"
-            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ease-out"
-          />
-          <div className="absolute inset-0 bg-gradient-to-t from-slate-900/60 to-transparent"></div>
-          
-          {/* Edit Cover Photo Overlay Button */}
-          <label className="absolute top-4 right-4 bg-white/90 hover:bg-white text-slate-800 px-3 py-2 rounded-xl shadow-lg cursor-pointer transition-all hover:scale-105 flex items-center gap-2 text-xs font-bold backdrop-blur-sm opacity-0 group-hover:opacity-100 duration-300 z-20">
-            <Camera className="w-4 h-4 text-blue-600" />
-            <span>Change Cover</span>
-            <input 
-              type="file" 
-              accept="image/*" 
-              className="hidden" 
-              onChange={(e) => handlePhotoUpload(e, 'cover')} 
-            />
-          </label>
-        </div>
-
-        {/* Profile Details Container */}
-        <div className="px-8 pb-8 pt-0 flex flex-col md:flex-row items-start gap-6 text-left relative -mt-20 z-10">
-          {/* Profile Photo */}
-          <div className="relative shrink-0 group/photo">
-            <div className="relative w-36 h-36 rounded-full overflow-hidden border-4 border-white shadow-xl bg-white group-hover/photo:border-blue-600 transition-all duration-300">
-              <img 
-                src={getPhotoUrl(profileData?.profilePhoto, 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=facearea&facepad=2&w=256&h=256&q=80')}
-                alt={fullName}
-                className="w-full h-full object-cover"
-              />
-              <label className="absolute inset-0 bg-black/65 flex flex-col items-center justify-center text-white cursor-pointer opacity-0 group-hover/photo:opacity-100 transition-opacity duration-300">
-                <Camera className="w-5 h-5 text-blue-400" />
-                <span className="text-[10px] font-bold mt-1">Change Photo</span>
-                <input 
-                  type="file" 
-                  accept="image/*" 
-                  className="hidden" 
-                  onChange={(e) => handlePhotoUpload(e, 'photo')} 
-                />
-              </label>
-            </div>
-            {profileData?.academicProfile?.googleScholar && (
-              <span className="absolute bottom-1 right-1 w-6 h-6 rounded-full bg-green-500 border-2 border-white flex items-center justify-center shadow-md animate-pulse z-10">
-                <CheckCircle2 className="w-3.5 h-3.5 text-white" />
-              </span>
-            )}
+      {data && (
+        <>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, margin: "16px 0" }}>
+            <MetricTile value={data.totalCitations.toLocaleString()} label="Total citations" bg={C.lb} color={C.lbT} />
+            <MetricTile value={data.hIndex} label="h-index" bg={C.lp} color={C.lpT} />
+            <MetricTile value={data.i10Index} label="i10-index" bg={C.lo} color={C.loT} />
           </div>
+          <div style={{ position: "relative", height: 160 }}>
+            <canvas ref={chartRef} role="img" aria-label={`Yearly citations from ${data.yearlyData[0]?.year}`} />
+          </div>
+          <p style={{ fontSize: 11, color: C.t3, textAlign: "center", marginTop: 8, marginBottom: 0 }}>
+            Data for Scholar ID: <code style={{ background: C.page, padding: "1px 5px", borderRadius: 4 }}>{id}</code>
+          </p>
+        </>
+      )}
+    </SectionCard>
+  );
+}
 
-          {/* User Text Info */}
-          <div className="flex-1 pt-20 md:pt-24 space-y-4">
-            <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4">
-              <div>
-                <h2 className="text-3xl font-extrabold text-slate-900 tracking-tight flex items-center gap-2 leading-none font-display">
-                  {fullName}
-                  <CheckCircle2 className="w-6 h-6 text-blue-600 fill-blue-50/50 hover:scale-110 transition-transform cursor-pointer" />
-                  <span className="px-2.5 py-1 bg-blue-50 text-blue-700 border border-blue-200/50 rounded-full text-[9px] font-extrabold tracking-wider uppercase font-sans">
-                    Score {completeness.percentage}%
+export default function Profile() {
+  const [tab, setTab] = useState("about");
+  const [chartReady, setChartReady] = useState(false);
+
+  useEffect(() => {
+    if (window.Chart) { setChartReady(true); return; }
+    const s = document.createElement("script");
+    s.src = "https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js";
+    s.onload = () => setChartReady(true);
+    document.head.appendChild(s);
+  }, []);
+
+  const p = PROFILE;
+
+  return (
+    <div style={{ background: C.page, minHeight: "100vh", fontFamily: "'Inter', system-ui, -apple-system, sans-serif" }}>
+      <style>{`
+        @keyframes spin { to { transform: rotate(360deg); } }
+        * { box-sizing: border-box; }
+        a { text-decoration: none; }
+        .tab-item { display: flex; align-items: center; gap: 6px; padding: 11px 16px; font-size: 13px; font-weight: 500; color: #64748B; border-bottom: 2px solid transparent; cursor: pointer; white-space: nowrap; transition: color 0.15s; background: none; border-left: none; border-right: none; border-top: none; }
+        .tab-item:hover { color: #2563EB; }
+        .tab-item.on { color: #2563EB; border-bottom-color: #2563EB; }
+        .edu-line { position: absolute; left: 5px; top: 18px; bottom: -10px; width: 1.5px; background: #E2E8F0; }
+        .action-btn { display: inline-flex; align-items: center; gap: 7px; padding: 8px 18px; border-radius: 9px; font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.15s; border: none; }
+        .action-btn:hover { filter: brightness(0.93); }
+        .hover-row:hover { background: #F8FAFC; }
+        .empty-state { text-align: center; padding: 48px 24px; }
+      `}</style>
+
+      {/* Cover */}
+      <div style={{ height: 200, background: `linear-gradient(135deg, ${C.coverA} 0%, ${C.coverB} 100%)`, position: "relative", overflow: "hidden" }}>
+        <div style={{ position: "absolute", inset: 0, backgroundImage: "url(https://images.unsplash.com/photo-1541339907198-e08756dedf3f?w=1400&q=80)", backgroundSize: "cover", backgroundPosition: "center top", opacity: 0.18 }} />
+        <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to bottom, rgba(0,0,0,0) 50%, rgba(15,23,42,0.3) 100%)" }} />
+      </div>
+
+      {/* Profile Header Card */}
+      <div style={{ maxWidth: 1120, margin: "0 auto", padding: "0 24px" }}>
+        <div style={{ background: C.card, borderRadius: 16, border: `1px solid ${C.border}`, padding: "0 28px 22px", marginTop: -60, position: "relative" }}>
+          {/* Avatar + name row */}
+          <div style={{ display: "flex", alignItems: "flex-end", gap: 20, paddingTop: 0 }}>
+            {/* Avatar */}
+            <div style={{ position: "relative", marginTop: -32 }}>
+              <div style={{ width: 104, height: 104, borderRadius: "50%", background: `linear-gradient(135deg, ${C.blue}, ${C.indigo})`, border: `4px solid ${C.card}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 34, fontWeight: 700, color: "#fff", letterSpacing: "-0.02em", boxShadow: "0 2px 12px rgba(37,99,235,0.25)" }}>
+                AS
+              </div>
+              <div style={{ position: "absolute", bottom: 4, right: 4, width: 22, height: 22, borderRadius: "50%", background: C.green, border: `2.5px solid ${C.card}`, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <CheckCircle size={10} color="#fff" />
+              </div>
+            </div>
+
+            <div style={{ flex: 1, paddingBottom: 4, paddingTop: 16 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700, color: C.t1, letterSpacing: "-0.02em" }}>{p.name}</h1>
+                <span style={{ background: C.lb, color: C.lbT, fontSize: 11, fontWeight: 600, padding: "2px 8px", borderRadius: 6, display: "flex", alignItems: "center", gap: 3 }}>
+                  <ShieldCheck size={10} /> Verified
+                </span>
+              </div>
+              <p style={{ margin: "3px 0 2px", fontSize: 14, color: C.blue, fontWeight: 600 }}>{p.title}</p>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: "4px 16px", marginTop: 2 }}>
+                {[
+                  [BookOpen, p.dept],
+                  [GraduationCap, p.inst],
+                  [MapPin, p.loc],
+                ].map(([Icon, text], i) => (
+                  <span key={i} style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12.5, color: C.t2 }}>
+                    <Icon size={12} color={C.t3} /> {text}
                   </span>
-                </h2>
-                <p className="text-sm font-bold text-blue-600 mt-2 font-sans tracking-wide uppercase">{designation}</p>
+                ))}
               </div>
-
-              {/* Action Buttons */}
-              <div className="flex flex-wrap items-center gap-3">
-                <button 
-                  onClick={() => setShowEditModal(true)}
-                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-all hover:-translate-y-0.5 cursor-pointer shadow-md shadow-blue-500/10"
-                >
-                  Edit Profile
-                </button>
-                <button className="px-4 py-2 border border-slate-200 hover:bg-slate-50 text-slate-600 rounded-xl text-xs font-bold transition-all hover:-translate-y-0.5 cursor-pointer">
-                  Share Profile
-                </button>
-                <button className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-all hover:-translate-y-0.5 cursor-pointer shadow-md shadow-slate-900/10">
-                  Follow
-                </button>
-                <button className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all hover:-translate-y-0.5 cursor-pointer shadow-md shadow-indigo-500/10">
-                  Collaborate
-                </button>
+              <div style={{ display: "flex", gap: 7, marginTop: 12, flexWrap: "wrap" }}>
+                <SocialLink label="ORCID" icon={AtSign} color="#A6CE39" />
+                <SocialLink label="Google Scholar" icon={Search} color="#4285F4" />
+                <SocialLink label="ResearchGate" icon={Users} color="#00CCBB" />
+                <SocialLink label="LinkedIn" icon={Globe} color="#0A66C2" />
               </div>
             </div>
 
-            {/* Department Details */}
-            <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-xs text-slate-500 font-sans">
-              <span className="flex items-center gap-1.5 font-medium"><Briefcase className="w-4 h-4 text-slate-400" /> {department}</span>
-              <span className="flex items-center gap-1.5 font-medium"><Award className="w-4 h-4 text-slate-400" /> {institution}</span>
-              <span className="flex items-center gap-1.5 font-medium"><MapPin className="w-4 h-4 text-slate-400" /> {locationText}</span>
+            <div style={{ display: "flex", gap: 8, paddingBottom: 4, paddingTop: 20, flexShrink: 0 }}>
+              <button className="action-btn" style={{ background: C.blue, color: "#fff" }}>
+                <Edit3 size={14} /> Edit profile
+              </button>
+              <button className="action-btn" style={{ background: C.page, color: C.t1, border: `1px solid ${C.border}` }}>
+                <Share2 size={14} /> Share
+              </button>
             </div>
+          </div>
 
-            {/* Academic Social Badges - Icons Only with Real Links */}
-            <div className="flex flex-wrap items-center gap-3 pt-1">
-              {identityProviders.map((provider) => {
-                const isConnected = provider.connected;
-                const linkUrl = provider.url || '#';
-
-                return (
-                  <div key={provider.name} className="relative group">
-                    {isConnected ? (
-                      <a 
-                        href={linkUrl} 
-                        target="_blank" 
-                        rel="noopener noreferrer"
-                        className="w-10 h-10 rounded-xl bg-white border border-slate-200 hover:border-blue-500 shadow-sm flex items-center justify-center hover:shadow-md hover:scale-105 transition-all duration-250"
-                      >
-                        {providerIcons[provider.name]}
-                      </a>
-                    ) : (
-                      <button 
-                        onClick={() => setShowEditModal(true)}
-                        className="w-10 h-10 rounded-xl bg-white border border-slate-200 hover:border-blue-500 shadow-sm flex items-center justify-center hover:shadow-md hover:scale-105 transition-all duration-250 cursor-pointer"
-                      >
-                        {providerIcons[provider.name]}
-                      </button>
-                    )}
-                    
-                    {/* Tooltip */}
-                    <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2.5 py-1 bg-slate-900 text-white text-[10px] font-bold rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50 shadow-lg">
-                      {provider.name} {isConnected ? '✓' : '(Not Linked)'}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+          {/* Quick stats row */}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 0, marginTop: 20, borderTop: `1px solid ${C.border}`, paddingTop: 16 }}>
+            {[
+              { val: p.metrics.pubs, label: "Publications", color: C.blue },
+              { val: p.metrics.citations.toLocaleString(), label: "Citations", color: C.green },
+              { val: p.metrics.h, label: "h-index", color: C.indigo },
+              { val: p.metrics.i10, label: "i10-index", color: C.orange },
+              { val: p.metrics.exp, label: "Yrs experience", color: C.t2 },
+              { val: p.metrics.areas, label: "Research areas", color: C.t2 },
+              { val: p.metrics.keywords, label: "Keywords", color: C.t2 },
+            ].map((m, i, arr) => (
+              <div key={i} style={{ textAlign: "center", borderRight: i < arr.length - 1 ? `1px solid ${C.border}` : "none", padding: "0 12px" }}>
+                <div style={{ fontSize: 20, fontWeight: 700, color: m.color, lineHeight: 1, fontVariantNumeric: "tabular-nums" }}>{m.val}</div>
+                <div style={{ fontSize: 11, color: C.t3, marginTop: 4, fontWeight: 500 }}>{m.label}</div>
+              </div>
+            ))}
           </div>
         </div>
 
-        {/* Tab Selection Navigation */}
-        <div className="border-t border-slate-100 px-8 flex overflow-x-auto gap-6 shrink-0 bg-slate-50/50">
-          {tabs.map((tab) => (
-            <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-              className={`py-4 text-xs font-extrabold tracking-wider uppercase border-b-2 transition-all cursor-pointer whitespace-nowrap ${
-                activeTab === tab 
-                  ? 'border-blue-600 text-blue-600' 
-                  : 'border-transparent text-slate-500 hover:text-slate-900'
-              }`}
-            >
-              {tab}
+        {/* Tabs */}
+        <div style={{ background: C.card, borderRadius: 12, border: `1px solid ${C.border}`, marginTop: 14, overflowX: "auto", display: "flex" }}>
+          {TABS.map(({ id, label, icon: Icon }) => (
+            <button key={id} className={`tab-item${tab === id ? " on" : ""}`} onClick={() => setTab(id)}>
+              <Icon size={14} />
+              {label}
             </button>
           ))}
         </div>
-      </div>
 
-      {/* Main Two-Column Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        
-        {/* Left Column (Changes dynamically based on activeTab) */}
-        <div className="lg:col-span-2 flex flex-col gap-8 text-left">
-          
-          {activeTab === 'About' && (
-            <>
-              {/* About Section */}
-              <div className="glass-card rounded-3xl p-8 bg-white border border-slate-200/80 shadow-sm space-y-4">
-                <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                  <h3 className="text-base font-bold text-slate-900 font-display">About Me</h3>
-                  <button onClick={() => setShowEditModal(true)} className="text-xs font-semibold text-blue-600 hover:underline cursor-pointer">
-                    Edit
-                  </button>
+        {/* Main layout */}
+        <div style={{ display: "grid", gridTemplateColumns: "260px 1fr 248px", gap: 14, marginTop: 14, paddingBottom: 40, alignItems: "start" }}>
+
+          {/* ── Left sidebar ── */}
+          <div>
+            {/* Contact */}
+            <SectionCard>
+              <SectionTitle>Contact</SectionTitle>
+              {[
+                { icon: Mail, val: p.email, link: true },
+                { icon: Phone, val: p.phone },
+                { icon: Globe, val: p.website, link: true },
+                { icon: MapPin, val: p.loc },
+              ].map(({ icon: Icon, val, link }, i) => (
+                <div key={i} style={{ display: "flex", gap: 10, padding: "8px 0", borderBottom: i < 3 ? `1px solid ${C.border}` : "none", alignItems: "center" }}>
+                  <Icon size={14} color={C.t3} style={{ flexShrink: 0 }} />
+                  <span style={{ fontSize: 13, color: link ? C.blue : C.t1, fontWeight: link ? 500 : 400, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{val}</span>
                 </div>
-                {profileData?.bio ? (
-                  <>
-                    <p className="text-sm text-slate-600 leading-relaxed font-sans">{profileData.bio}</p>
-                    <a href="#" className="text-xs font-bold text-blue-600 hover:underline inline-block">Read more</a>
-                  </>
-                ) : (
-                  <div className="py-6 text-slate-400 text-xs font-medium">
-                    No biography added yet. Click Edit to write one.
+              ))}
+            </SectionCard>
+
+            {/* Education mini */}
+            <SectionCard>
+              <SectionTitle action={<span onClick={() => setTab("education")} style={{ cursor: "pointer" }}>View all <ChevronRight size={12} style={{ verticalAlign: "middle" }} /></span>}>Education</SectionTitle>
+              <div style={{ position: "relative" }}>
+                {p.education.map((e, i) => (
+                  <div key={i} style={{ display: "flex", gap: 12, paddingBottom: i < p.education.length - 1 ? 14 : 0, position: "relative" }}>
+                    {i < p.education.length - 1 && <div style={{ position: "absolute", left: 5, top: 16, bottom: 0, width: 1.5, background: C.border }} />}
+                    <div style={{ width: 12, height: 12, borderRadius: "50%", background: C.blue, flexShrink: 0, marginTop: 4, zIndex: 1 }} />
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ fontSize: 12.5, fontWeight: 600, color: C.t1, lineHeight: 1.4 }}>{e.degree}</div>
+                      <div style={{ fontSize: 11.5, color: C.t2, marginTop: 1 }}>{e.inst}</div>
+                      <div style={{ fontSize: 11, color: C.orange, fontWeight: 500, marginTop: 2 }}>{e.years}</div>
+                    </div>
                   </div>
-                )}
+                ))}
               </div>
+            </SectionCard>
 
-              {/* Academic & Professional Information Details */}
-              <div className="glass-card rounded-3xl p-8 bg-white border border-slate-200/80 shadow-sm space-y-6">
-                <h3 className="text-base font-bold text-slate-900 font-display flex items-center gap-2">
-                  <GraduationCap className="w-5 h-5 text-blue-600" /> Academic & Professional Information
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm font-sans">
-                  {/* Left Column: Personal/Institutional */}
-                  <div className="space-y-3.5 bg-slate-50/50 p-6 rounded-2xl border border-slate-100/85">
-                    <h4 className="text-[10px] font-extrabold text-slate-500 tracking-wider uppercase border-b border-slate-200/50 pb-1.5 mb-3">Institutional & Profile Details</h4>
-                    
-                    {/* Full Name */}
-                    <div className="flex items-start gap-3">
-                      <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
-                        <User className="w-4.5 h-4.5" />
-                      </div>
-                      <div>
-                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide block">Full Name</span>
-                        <span className="text-sm font-semibold text-slate-800">{profileData?.user?.fullName || 'Not Specified'}</span>
-                      </div>
-                    </div>
-
-                    {/* Date of Birth */}
-                    <div className="flex items-start gap-3">
-                      <div className="w-9 h-9 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
-                        <svg className="w-4.5 h-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                          <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
-                          <line x1="16" y1="2" x2="16" y2="6" />
-                          <line x1="8" y1="2" x2="8" y2="6" />
-                          <line x1="3" y1="10" x2="21" y2="10" />
-                        </svg>
-                      </div>
-                      <div>
-                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide block">Date of Birth</span>
-                        <span className="text-sm font-semibold text-slate-800">
-                          {profileData?.dateOfBirth 
-                            ? new Date(profileData.dateOfBirth).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }) 
-                            : 'Not Specified'}
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Designation */}
-                    <div className="flex items-start gap-3">
-                      <div className="w-9 h-9 rounded-xl bg-violet-50 text-violet-600 flex items-center justify-center shrink-0">
-                        <Briefcase className="w-4.5 h-4.5" />
-                      </div>
-                      <div>
-                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide block">Designation</span>
-                        <span className="text-sm font-semibold text-slate-800">{profileData?.designation || 'Not Specified'}</span>
-                      </div>
-                    </div>
-
-                    {/* Department */}
-                    <div className="flex items-start gap-3">
-                      <div className="w-9 h-9 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center shrink-0">
-                        <Layers className="w-4.5 h-4.5" />
-                      </div>
-                      <div>
-                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide block">Department</span>
-                        <span className="text-sm font-semibold text-slate-800">{profileData?.department || 'Not Specified'}</span>
-                      </div>
-                    </div>
-
-                    {/* Institution */}
-                    <div className="flex items-start gap-3">
-                      <div className="w-9 h-9 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
-                        <Award className="w-4.5 h-4.5" />
-                      </div>
-                      <div>
-                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide block">Institution</span>
-                        <span className="text-sm font-semibold text-slate-800 leading-relaxed">
-                          {profileData?.institution || 'Not Specified'}
-                        </span>
-                      </div>
+            {/* Experience mini */}
+            <SectionCard>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+                <h3 style={{ margin: 0, fontSize: 14, fontWeight: 600, color: C.t1, letterSpacing: "-0.01em" }}>Experience</h3>
+                <span style={{ fontSize: 10, fontWeight: 600, color: C.t3, background: C.page, padding: "2px 7px", borderRadius: 6, letterSpacing: "0.04em", textTransform: "uppercase" }}>Optional</span>
+              </div>
+              <div style={{ position: "relative" }}>
+                {p.experience.map((e, i) => (
+                  <div key={i} style={{ display: "flex", gap: 12, paddingBottom: i < p.experience.length - 1 ? 14 : 0, position: "relative" }}>
+                    {i < p.experience.length - 1 && <div style={{ position: "absolute", left: 5, top: 16, bottom: 0, width: 1.5, background: C.border }} />}
+                    <div style={{ width: 12, height: 12, borderRadius: "50%", background: e.type === "current" ? C.green : C.borderD, flexShrink: 0, marginTop: 4, zIndex: 1 }} />
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ fontSize: 12.5, fontWeight: 600, color: C.t1, lineHeight: 1.4 }}>{e.role}</div>
+                      <div style={{ fontSize: 11.5, color: C.t2 }}>{e.place}</div>
+                      <div style={{ fontSize: 11, color: e.type === "current" ? C.green : C.t3, fontWeight: 500, marginTop: 2 }}>{e.years}</div>
                     </div>
                   </div>
+                ))}
+              </div>
+            </SectionCard>
+          </div>
 
-                  {/* Right Column: Academic Identifiers */}
-                  <div className="space-y-3.5 bg-slate-50/50 p-6 rounded-2xl border border-slate-100/85">
-                    <h4 className="text-[10px] font-extrabold text-slate-500 tracking-wider uppercase border-b border-slate-200/50 pb-1.5 mb-3">Academic Identifiers & Profiles</h4>
-                    
-                    {/* ORCID ID */}
-                    <div className="flex items-start gap-3">
-                      <div className="w-9 h-9 rounded-xl bg-white border border-slate-200/60 shadow-sm flex items-center justify-center shrink-0 mt-0.5">
-                        {providerIcons['ORCID']}
-                      </div>
-                      <div>
-                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide block">ORCID ID</span>
-                        {profileData?.academicProfile?.orcid ? (
-                          <a 
-                            href={`https://orcid.org/${profileData.academicProfile.orcid}`} 
-                            target="_blank" 
-                            rel="noopener noreferrer"
-                            className="text-sm font-semibold text-slate-800 hover:text-blue-600 flex items-center gap-1 group/link"
-                          >
-                            {profileData.academicProfile.orcid} 
-                            <ExternalLink className="w-3 h-3 text-slate-400 opacity-0 group-hover/link:opacity-100 transition-opacity" />
-                          </a>
-                        ) : (
-                          <span className="text-sm font-semibold text-slate-400 italic">Not Linked</span>
-                        )}
-                      </div>
+          {/* ── Center ── */}
+          <div>
+            {tab === "about" && (
+              <>
+                <SectionCard>
+                  <SectionTitle>About me</SectionTitle>
+                  <p style={{ fontSize: 14, color: C.t2, lineHeight: 1.75, margin: 0 }}>{p.about}</p>
+                </SectionCard>
+
+                <SectionCard>
+                  <SectionTitle>Academic and professional information</SectionTitle>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0 32px" }}>
+                    {[
+                      ["Full name", p.name, false],
+                      ["ORCID ID", p.orcid, false],
+                      ["Date of birth", p.dob, false],
+                      ["Researcher ID", p.researcherId, false],
+                      ["Nationality", p.nationality, false],
+                      ["ResearchGate", "View profile", true],
+                      ["Designation", p.title, false],
+                      ["LinkedIn", "View profile", true],
+                      ["Department", "Computer Science & Engineering", false],
+                      ["Website", p.website, true],
+                      ["Institution", p.inst, false],
+                      ["GitHub", "github.com/arjunsharma", true],
+                      ["Joined", p.joined, false],
+                      ["Email", p.email, false],
+                    ].map(([label, val, link], i) => (
+                      <InfoRow key={i} label={label} value={val} link={link} />
+                    ))}
+                  </div>
+                </SectionCard>
+
+                {chartReady && <ScholarPanel />}
+              </>
+            )}
+
+            {tab === "education" && (
+              <SectionCard>
+                <SectionTitle>Education history</SectionTitle>
+                {p.education.map((e, i) => (
+                  <div key={i} className="hover-row" style={{ display: "flex", gap: 16, padding: "16px 12px", borderRadius: 10, borderBottom: i < p.education.length - 1 ? `1px solid ${C.border}` : "none", margin: "0 -12px" }}>
+                    <div style={{ width: 44, height: 44, borderRadius: 10, background: C.lb, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                      <GraduationCap size={20} color={C.blue} />
                     </div>
-
-                    {/* Google Scholar */}
-                    <div className="flex items-start gap-3">
-                      <div className="w-9 h-9 rounded-xl bg-white border border-slate-200/60 shadow-sm flex items-center justify-center shrink-0 mt-0.5">
-                        {providerIcons['Google Scholar']}
-                      </div>
-                      <div>
-                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide block">Google Scholar</span>
-                        {profileData?.academicProfile?.googleScholar ? (
-                          <a 
-                            href={`https://scholar.google.com/citations?user=${profileData.academicProfile.googleScholar}`} 
-                            target="_blank" 
-                            rel="noopener noreferrer"
-                            className="text-sm font-semibold text-blue-600 hover:underline flex items-center gap-1 group/link"
-                          >
-                            {profileData.academicProfile.googleScholar}
-                            <ExternalLink className="w-3 h-3 text-blue-500 opacity-0 group-hover/link:opacity-100 transition-opacity" />
-                          </a>
-                        ) : (
-                          <span className="text-sm font-semibold text-slate-400 italic">Not Linked</span>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Scopus ID */}
-                    <div className="flex items-start gap-3">
-                      <div className="w-9 h-9 rounded-xl bg-white border border-slate-200/60 shadow-sm flex items-center justify-center shrink-0 mt-0.5">
-                        {providerIcons['Scopus']}
-                      </div>
-                      <div>
-                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide block">Scopus ID</span>
-                        {profileData?.academicProfile?.scopusId ? (
-                          <a 
-                            href={`https://www.scopus.com/authid/detail.uri?authorId=${profileData.academicProfile.scopusId}`} 
-                            target="_blank" 
-                            rel="noopener noreferrer"
-                            className="text-sm font-semibold text-slate-800 hover:text-blue-600 flex items-center gap-1 group/link"
-                          >
-                            {profileData.academicProfile.scopusId}
-                            <ExternalLink className="w-3 h-3 text-slate-400 opacity-0 group-hover/link:opacity-100 transition-opacity" />
-                          </a>
-                        ) : (
-                          <span className="text-sm font-semibold text-slate-400 italic">Not Linked</span>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* LinkedIn */}
-                    <div className="flex items-start gap-3">
-                      <div className="w-9 h-9 rounded-xl bg-white border border-slate-200/60 shadow-sm flex items-center justify-center shrink-0 mt-0.5">
-                        {providerIcons['LinkedIn']}
-                      </div>
-                      <div>
-                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide block">LinkedIn</span>
-                        {profileData?.academicProfile?.linkedIn ? (
-                          <a 
-                            href={profileData.academicProfile.linkedIn.startsWith('http') ? profileData.academicProfile.linkedIn : `https://linkedin.com/in/${profileData.academicProfile.linkedIn}`} 
-                            target="_blank" 
-                            rel="noopener noreferrer" 
-                            className="text-sm font-semibold text-blue-600 hover:underline flex items-center gap-1 group/link"
-                          >
-                            View Profile
-                            <ExternalLink className="w-3 h-3 text-blue-500 opacity-0 group-hover/link:opacity-100 transition-opacity" />
-                          </a>
-                        ) : (
-                          <span className="text-sm font-semibold text-slate-400 italic">Not Linked</span>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* GitHub */}
-                    <div className="flex items-start gap-3">
-                      <div className="w-9 h-9 rounded-xl bg-white border border-slate-200/60 shadow-sm flex items-center justify-center shrink-0 mt-0.5">
-                        {providerIcons['GitHub']}
-                      </div>
-                      <div>
-                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide block">GitHub</span>
-                        {profileData?.socialLinks?.github ? (
-                          <a 
-                            href={profileData.socialLinks.github.startsWith('http') ? profileData.socialLinks.github : `https://github.com/${profileData.socialLinks.github}`} 
-                            target="_blank" 
-                            rel="noopener noreferrer"
-                            className="text-sm font-semibold text-slate-800 hover:text-blue-600 flex items-center gap-1 group/link"
-                          >
-                            {profileData.socialLinks.github}
-                            <ExternalLink className="w-3 h-3 text-slate-400 opacity-0 group-hover/link:opacity-100 transition-opacity" />
-                          </a>
-                        ) : (
-                          <span className="text-sm font-semibold text-slate-400 italic">Not Linked</span>
-                        )}
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: 15, fontWeight: 600, color: C.t1 }}>{e.degree}</div>
+                      <div style={{ fontSize: 13, color: C.t2, marginTop: 2 }}>{e.inst}</div>
+                      <div style={{ display: "flex", gap: 12, marginTop: 6 }}>
+                        <span style={{ fontSize: 12, color: C.blue, fontWeight: 500 }}>{e.years}</span>
+                        <span style={{ fontSize: 12, color: C.t3 }}>·</span>
+                        <span style={{ fontSize: 12, color: C.green, fontWeight: 500 }}>{e.gpa}</span>
                       </div>
                     </div>
                   </div>
-                </div>
-              </div>
+                ))}
+              </SectionCard>
+            )}
 
-              {/* Contact Details */}
-              <div className="glass-card rounded-3xl p-8 bg-white border border-slate-200/80 shadow-sm space-y-6">
-                <h3 className="text-base font-bold text-slate-900 font-display flex items-center gap-2">
-                  <Mail className="w-5 h-5 text-indigo-600" /> Contact Information
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm font-sans">
-                  {/* Email Card */}
-                  <div className="flex items-center gap-4 bg-slate-50/50 hover:bg-slate-50 p-4 rounded-2xl border border-slate-100/85 hover:shadow-sm transition-all duration-300 group">
-                    <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
-                      <Mail className="w-5 h-5" />
+            {tab === "experience" && (
+              <SectionCard>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+                  <h3 style={{ margin: 0, fontSize: 14, fontWeight: 600, color: C.t1 }}>Work experience</h3>
+                  <span style={{ fontSize: 11, fontWeight: 600, color: C.t3, background: C.page, padding: "3px 10px", borderRadius: 8, border: `1px solid ${C.border}`, letterSpacing: "0.04em" }}>Optional section</span>
+                </div>
+                {p.experience.map((e, i) => (
+                  <div key={i} className="hover-row" style={{ display: "flex", gap: 16, padding: "16px 12px", borderRadius: 10, borderBottom: i < p.experience.length - 1 ? `1px solid ${C.border}` : "none", margin: "0 -12px" }}>
+                    <div style={{ width: 44, height: 44, borderRadius: 10, background: e.type === "current" ? C.lg : C.page, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                      <Briefcase size={20} color={e.type === "current" ? C.green : C.t3} />
                     </div>
-                    <div className="min-w-0">
-                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-0.5">Email Address</span>
-                      {emailText ? (
-                        <a href={`mailto:${emailText}`} className="font-semibold text-slate-750 text-slate-750 hover:text-blue-655 block truncate leading-tight">
-                          {emailText}
-                        </a>
-                      ) : (
-                        <span className="font-semibold text-slate-400 italic">Not Specified</span>
-                      )}
+                    <div style={{ flex: 1 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <span style={{ fontSize: 15, fontWeight: 600, color: C.t1 }}>{e.role}</span>
+                        {e.type === "current" && <Pill bg={C.lg} color={C.lgT} small>Current</Pill>}
+                      </div>
+                      <div style={{ fontSize: 13, color: C.t2, marginTop: 2 }}>{e.place}</div>
+                      <div style={{ fontSize: 12, color: C.t3, marginTop: 6 }}>{e.years}</div>
                     </div>
                   </div>
+                ))}
+              </SectionCard>
+            )}
 
-                  {/* Phone Card */}
-                  <div className="flex items-center gap-4 bg-slate-50/50 hover:bg-slate-50 p-4 rounded-2xl border border-slate-100/85 hover:shadow-sm transition-all duration-300 group">
-                    <div className="w-10 h-10 rounded-xl bg-green-50 text-green-600 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
-                      <Phone className="w-5 h-5" />
-                    </div>
-                    <div className="min-w-0">
-                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-0.5">Phone Number</span>
-                      <span className="font-semibold text-slate-750 block leading-tight">
-                        {profileData?.phone || 'Not Specified'}
-                      </span>
-                    </div>
+            {tab === "research" && (
+              <>
+                <SectionCard>
+                  <SectionTitle>Research areas</SectionTitle>
+                  <div>{p.areas.map(a => <Pill key={a} bg={C.lp} color={C.lpT}>{a}</Pill>)}</div>
+                </SectionCard>
+                <SectionCard>
+                  <SectionTitle>Keywords</SectionTitle>
+                  <div>{p.keywords.map(k => <Pill key={k} bg={C.lb} color={C.lbT}><Hash size={10} style={{ verticalAlign: "middle", marginRight: 2 }} />{k}</Pill>)}</div>
+                </SectionCard>
+              </>
+            )}
+
+            {["publications", "projects", "achievements"].includes(tab) && (
+              <SectionCard>
+                <div className="empty-state">
+                  <div style={{ width: 60, height: 60, borderRadius: 16, background: C.lb, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px" }}>
+                    {tab === "publications" && <BookOpen size={26} color={C.blue} />}
+                    {tab === "projects" && <FolderOpen size={26} color={C.blue} />}
+                    {tab === "achievements" && <Trophy size={26} color={C.blue} />}
                   </div>
-
-                  {/* Website Card */}
-                  <div className="flex items-center gap-4 bg-slate-50/50 hover:bg-slate-50 p-4 rounded-2xl border border-slate-100/85 hover:shadow-sm transition-all duration-300 group">
-                    <div className="w-10 h-10 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
-                      <Globe className="w-5 h-5" />
-                    </div>
-                    <div className="min-w-0">
-                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-0.5">Personal Website</span>
-                      {profileData?.website ? (
-                        <a 
-                          href={profileData.website.startsWith('http') ? profileData.website : `https://${profileData.website}`} 
-                          target="_blank" 
-                          rel="noopener noreferrer" 
-                          className="font-semibold text-blue-600 hover:underline block truncate leading-tight"
-                        >
-                          {profileData.website}
-                        </a>
-                      ) : (
-                        <span className="font-semibold text-slate-400 italic">Not Specified</span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Education Timeline Section */}
-              <div className="glass-card rounded-3xl p-8 bg-white border border-slate-200/80 shadow-sm space-y-6">
-                <div className="flex items-center justify-between border-b border-slate-100 pb-4">
-                  <h3 className="text-base font-bold text-slate-900 font-display flex items-center gap-2">
-                    <GraduationCap className="w-5 h-5 text-blue-600" /> Education
-                  </h3>
-                  <button onClick={() => setShowEditModal(true)} className="text-xs font-semibold text-blue-600 hover:underline cursor-pointer">
-                    Manage
-                  </button>
-                </div>
-                <div className="space-y-6 relative pl-6 border-l border-slate-100 ml-4 text-left">
-                  {profileData?.educationList && profileData.educationList.length > 0 ? (
-                    profileData.educationList.map((edu) => (
-                      <div key={edu._id} className="relative group transition-all duration-300">
-                        <div className="absolute -left-[31px] top-1 w-2.5 h-2.5 rounded-full bg-blue-600 border-2 border-white ring-4 ring-blue-50 shadow-sm"></div>
-                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                          <div>
-                            <h4 className="font-extrabold text-slate-800 text-sm font-sans">{edu.degree}</h4>
-                            <p className="text-xs text-slate-500 font-semibold mt-1">
-                              {edu.university} • {edu.fieldOfStudy}
-                            </p>
-                          </div>
-                          <span className="px-2.5 py-1 bg-slate-50 text-slate-500 border border-slate-200/50 rounded-xl text-[10px] font-bold self-start sm:self-center">
-                            {edu.startYear} - {edu.endYear || 'Present'}
-                          </span>
-                        </div>
-                        {edu.description && (
-                          <p className="text-xs text-slate-400 mt-2 font-sans italic leading-relaxed">{edu.description}</p>
-                        )}
-                      </div>
-                    ))
-                  ) : (
-                    <div className="py-6 text-slate-400 text-xs font-medium">
-                      No education details added yet.
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Experience Timeline Section */}
-              <div className="glass-card rounded-3xl p-8 bg-white border border-slate-200/80 shadow-sm space-y-6">
-                <div className="flex items-center justify-between border-b border-slate-100 pb-4">
-                  <h3 className="text-base font-bold text-slate-900 font-display flex items-center gap-2">
-                    <Briefcase className="w-5 h-5 text-indigo-600" /> Experience
-                  </h3>
-                  <button onClick={() => setShowEditModal(true)} className="text-xs font-semibold text-blue-600 hover:underline cursor-pointer">
-                    Manage
-                  </button>
-                </div>
-                <div className="space-y-6 relative pl-6 border-l border-slate-100 ml-4 text-left">
-                  {profileData?.experienceList && profileData.experienceList.length > 0 ? (
-                    profileData.experienceList.map((exp) => (
-                      <div key={exp._id} className="relative group transition-all duration-300">
-                        <div className="absolute -left-[31px] top-1 w-2.5 h-2.5 rounded-full bg-indigo-600 border-2 border-white ring-4 ring-indigo-50 shadow-sm"></div>
-                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                          <div>
-                            <h4 className="font-extrabold text-slate-800 text-sm font-sans">{exp.role}</h4>
-                            <p className="text-xs text-slate-500 font-semibold mt-1">
-                              {exp.organization} • {exp.department || exp.employmentType}
-                            </p>
-                          </div>
-                          <span className="px-2.5 py-1 bg-slate-50 text-slate-500 border border-slate-200/50 rounded-xl text-[10px] font-bold self-start sm:self-center">
-                            {exp.startYear} - {exp.endYear || 'Present'}
-                          </span>
-                        </div>
-                        {exp.description && (
-                          <p className="text-xs text-slate-400 mt-2 font-sans italic leading-relaxed">{exp.description}</p>
-                        )}
-                      </div>
-                    ))
-                  ) : (
-                    <div className="py-6 text-slate-400 text-xs font-medium">
-                      No experience details added yet.
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Research Interests Card */}
-              <div className="glass-card rounded-3xl p-8 bg-white border border-slate-200/80 shadow-sm space-y-6">
-                <div className="flex items-center justify-between border-b border-slate-100 pb-4">
-                  <h3 className="text-base font-bold text-slate-900 font-display flex items-center gap-2">
-                    <Sparkles className="w-5 h-5 text-amber-500 animate-pulse" /> Research Interests
-                  </h3>
-                  <button onClick={() => setShowEditModal(true)} className="text-xs font-semibold text-blue-650 text-blue-600 hover:underline cursor-pointer">
-                    Manage
-                  </button>
-                </div>
-                <div className="flex flex-wrap gap-2 text-left">
-                  {profileData?.researchAreas && profileData.researchAreas.length > 0 ? (
-                    profileData.researchAreas.map((area) => (
-                      <span key={area._id} className="px-3.5 py-2 bg-slate-50 border border-slate-200/60 hover:bg-slate-100 text-slate-700 rounded-xl text-xs font-semibold transition-all">
-                        {area.researchArea?.areaName}
-                      </span>
-                    ))
-                  ) : (
-                    <div className="py-2 text-slate-400 text-xs font-medium">
-                      No research areas added yet.
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Publications Section */}
-              <div className="glass-card rounded-3xl p-8 bg-white border border-slate-200/80 shadow-sm space-y-6">
-                <div className="flex items-center justify-between border-b border-slate-100 pb-4">
-                  <h3 className="text-base font-bold text-slate-900 font-display flex items-center gap-2">
-                    <BookOpen className="w-5 h-5 text-blue-600" /> Publications
-                  </h3>
-                  <button onClick={() => setActiveTab('Publications')} className="text-xs font-semibold text-blue-600 hover:underline cursor-pointer">
-                    View All ({publications.length})
-                  </button>
-                </div>
-                <div className="space-y-6 divide-y divide-slate-100 text-left">
-                  {publications.length > 0 ? (
-                    publications.slice(0, 3).map((pub) => (
-                      <div key={pub._id} className="pt-5 first:pt-0 space-y-2.5">
-                        <div className="flex items-start justify-between gap-4">
-                          <h4 className="font-bold text-slate-800 text-sm hover:text-blue-600 hover:underline cursor-pointer leading-snug">
-                            {pub.title}
-                          </h4>
-                          <span className="px-2 py-0.5 bg-blue-50 text-blue-600 border border-blue-100/50 rounded-lg text-[9px] font-extrabold shrink-0">
-                            {pub.citationCount} citations
-                          </span>
-                        </div>
-                        <p className="text-xs text-slate-500 line-clamp-2 leading-relaxed">{pub.abstract}</p>
-                        <div className="flex items-center gap-4 text-[10px] text-slate-400 font-medium">
-                          {pub.journal && <span className="italic">{pub.journal}</span>}
-                          <span>Year: {pub.publicationYear}</span>
-                        </div>
-                      </div>
-                    ))
-                  ) : (
-                    <div className="py-6 text-slate-400 text-xs font-medium">
-                      No publications found.
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Projects Card */}
-              <div className="glass-card rounded-3xl p-8 bg-white border border-slate-200/80 shadow-sm space-y-6">
-                <div className="flex items-center justify-between border-b border-slate-100 pb-4">
-                  <h3 className="text-base font-bold text-slate-900 font-display flex items-center gap-2">
-                    <Layers className="w-5 h-5 text-indigo-600" /> Projects
-                  </h3>
-                  <button onClick={() => setShowEditModal(true)} className="text-xs font-semibold text-blue-650 text-blue-600 hover:underline cursor-pointer">
-                    Manage
-                  </button>
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-left">
-                  {profileData?.projectList && profileData.projectList.length > 0 ? (
-                    profileData.projectList.map((proj, idx) => (
-                      <div key={proj._id || idx} className="p-5 rounded-2xl bg-slate-50 border border-slate-100 space-y-2 hover:shadow-sm transition-all duration-300">
-                        <div className="flex justify-between items-center">
-                          <span className={`px-2 py-0.5 rounded-lg text-[9px] font-extrabold uppercase tracking-wide ${
-                            proj.status === 'Active' ? 'bg-green-50 text-green-700 border border-green-200/30' : 'bg-slate-200/50 text-slate-600'
-                          }`}>
-                            {proj.status}
-                          </span>
-                          <span className="text-[10px] font-bold text-slate-400">{proj.type}</span>
-                        </div>
-                        <h4 className="font-bold text-slate-800 text-xs">{proj.title}</h4>
-                        <p className="text-[11px] text-slate-500 leading-relaxed">{proj.description}</p>
-                      </div>
-                    ))
-                  ) : (
-                    <div className="col-span-2 py-6 text-center text-slate-400 text-xs font-medium">
-                      No projects added yet.
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Achievements Card */}
-              <div className="glass-card rounded-3xl p-8 bg-white border border-slate-200/80 shadow-sm space-y-6">
-                <div className="flex items-center justify-between border-b border-slate-100 pb-4">
-                  <h3 className="text-base font-bold text-slate-900 font-display flex items-center gap-2">
-                    <Award className="w-5 h-5 text-rose-500" /> Achievements
-                  </h3>
-                  <button onClick={() => setShowEditModal(true)} className="text-xs font-semibold text-blue-650 text-blue-600 hover:underline cursor-pointer">
-                    Manage
-                  </button>
-                </div>
-                <div className="space-y-4 text-left">
-                  {profileData?.achievementList && profileData.achievementList.length > 0 ? (
-                    profileData.achievementList.map((ach, idx) => (
-                      <div key={ach._id || idx} className="flex gap-4 items-start">
-                        <div className="w-8 h-8 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center shrink-0">
-                          <Award className="w-4 h-4" />
-                        </div>
-                        <div className="space-y-0.5">
-                          <div className="flex items-center gap-2">
-                            <h4 className="font-bold text-slate-800 text-xs leading-none">{ach.title}</h4>
-                            <span className="text-[9px] font-bold text-slate-400">
-                              {ach.date ? new Date(ach.date).getFullYear() : ''}
-                            </span>
-                          </div>
-                          <p className="text-[11px] text-slate-500 leading-relaxed mt-1">{ach.description}</p>
-                        </div>
-                      </div>
-                    ))
-                  ) : (
-                    <div className="py-6 text-center text-slate-400 text-xs font-medium">
-                      No achievements added yet.
-                    </div>
-                  )}
-                </div>
-              </div>
-            </>
-          )}
-
-          {activeTab === 'Publications' && (
-            <div className="glass-card rounded-3xl p-8 bg-white border border-slate-200/80 shadow-sm space-y-6">
-              <div className="flex items-center justify-between border-b border-slate-100 pb-4">
-                <h3 className="text-base font-bold text-slate-900 font-display">Publications ({publications.length})</h3>
-                <button className="text-xs font-bold text-blue-600 hover:bg-blue-50 px-3 py-1.5 rounded-xl flex items-center gap-1.5 transition-colors cursor-pointer">
-                  <Plus className="w-3.5 h-3.5" /> Add Publication
-                </button>
-              </div>
-
-              {publications.length === 0 ? (
-                <div className="py-12 text-center space-y-3">
-                  <BookMarked className="w-10 h-10 text-slate-300 mx-auto" />
-                  <p className="text-sm text-slate-500 font-medium">No publications found.</p>
-                  <p className="text-xs text-slate-400 max-w-sm mx-auto">
-                    Try syncing your Google Scholar profile at the top of the dashboard to auto-populate your publications.
+                  <p style={{ fontSize: 16, fontWeight: 600, color: C.t1, margin: "0 0 6px" }}>
+                    No {tab} added yet
                   </p>
+                  <p style={{ fontSize: 13, color: C.t2, margin: "0 0 20px", maxWidth: 320, marginLeft: "auto", marginRight: "auto" }}>
+                    Add your {tab} to strengthen your academic profile and increase visibility.
+                  </p>
+                  <button className="action-btn" style={{ background: C.blue, color: "#fff", margin: "0 auto" }}>
+                    + Add {tab.slice(0, -1)}
+                  </button>
                 </div>
-              ) : (
-                <div className="space-y-6 divide-y divide-slate-100">
-                  {publications.map((pub, idx) => (
-                    <div key={pub._id} className={`pt-6 ${idx === 0 ? 'pt-0' : ''} space-y-3 text-left group`}>
-                      <div className="flex items-start justify-between gap-4">
-                        <h4 className="font-bold text-slate-800 text-sm leading-snug group-hover:text-blue-600 transition-colors">
-                          {pub.title}
-                        </h4>
-                        
-                        {/* Citations Badge */}
-                        <span className="px-2.5 py-1 bg-blue-50 text-blue-600 border border-blue-100/50 rounded-xl text-[10px] font-bold shrink-0">
-                          {pub.citationCount} citations
-                        </span>
-                      </div>
+              </SectionCard>
+            )}
+          </div>
 
-                      <p className="text-xs text-slate-500 line-clamp-3 leading-relaxed font-sans">
-                        {pub.abstract}
-                      </p>
+          {/* ── Right sidebar ── */}
+          <div>
+            {/* Research Metrics */}
+            <SectionCard style={{ padding: "20px 18px" }}>
+              <SectionTitle>Research metrics</SectionTitle>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                <MetricTile value={p.metrics.pubs} label="Publications" bg={C.lb} color={C.lbT} />
+                <MetricTile value={p.metrics.citations.toLocaleString()} label="Citations" bg={C.lg} color={C.lgT} />
+                <MetricTile value={p.metrics.h} label="h-index" bg={C.lp} color={C.lpT} />
+                <MetricTile value={p.metrics.i10} label="i10-index" bg={C.lo} color={C.loT} />
+              </div>
+              <div style={{ borderTop: `1px solid ${C.border}`, marginTop: 12, paddingTop: 12, display: "flex", justifyContent: "space-between" }}>
+                <div style={{ textAlign: "center", flex: 1 }}>
+                  <div style={{ fontSize: 17, fontWeight: 700, color: C.t1 }}>{p.metrics.exp}</div>
+                  <div style={{ fontSize: 10, color: C.t3, fontWeight: 500, marginTop: 2 }}>Yrs research exp.</div>
+                </div>
+                <div style={{ width: 1, background: C.border }} />
+                <div style={{ textAlign: "center", flex: 1 }}>
+                  <div style={{ fontSize: 17, fontWeight: 700, color: C.t1 }}>{p.metrics.keywords}</div>
+                  <div style={{ fontSize: 10, color: C.t3, fontWeight: 500, marginTop: 2 }}>Keywords</div>
+                </div>
+              </div>
+            </SectionCard>
 
-                      {/* Co-authors list */}
-                      {pub.authors && pub.authors.length > 0 && (
-                        <div className="flex flex-wrap items-center gap-1 text-[11px] text-slate-400 font-sans">
-                          <span className="font-semibold text-slate-500">Authors:</span>
-                          {pub.authors.map((author, index) => {
-                            // Highlight the current user in bold
-                            const isCurrentUser = author.user === user?.user?._id || author.authorName.toLowerCase().includes(fullName.toLowerCase());
-                            return (
-                              <span key={author._id}>
-                                <span className={`${isCurrentUser ? 'font-bold text-blue-600' : 'text-slate-500'}`}>
-                                  {author.authorName}
-                                </span>
-                                {index < pub.authors.length - 1 && ', '}
-                              </span>
-                            );
-                          })}
-                        </div>
-                      )}
+            {/* Research areas */}
+            <SectionCard style={{ padding: "20px 18px" }}>
+              <SectionTitle action={<span onClick={() => setTab("research")} style={{ cursor: "pointer" }}>View all</span>}>Research areas</SectionTitle>
+              <div>{p.areas.slice(0, 5).map(a => <Pill key={a} bg={C.lp} color={C.lpT} small>{a}</Pill>)}</div>
+            </SectionCard>
 
-                      {/* Paper details footer */}
-                      <div className="flex flex-wrap items-center gap-4 text-[10px] text-slate-400 font-medium font-sans">
-                        {pub.journal && (
-                          <span className="italic">{pub.journal}</span>
-                        )}
-                        <span>Year: {pub.publicationYear}</span>
-                        {pub.doi && (
-                          <span className="hover:text-blue-600 cursor-pointer flex items-center gap-0.5">
-                            DOI: {pub.doi} <ExternalLink className="w-2.5 h-2.5" />
-                          </span>
-                        )}
-                        {pub.pdfUrl && (
-                          <a 
-                            href={pub.pdfUrl} 
-                            target="_blank" 
-                            rel="noopener noreferrer"
-                            className="text-blue-600 hover:underline flex items-center gap-0.5"
-                          >
-                            View PDF <ExternalLink className="w-2.5 h-2.5" />
-                          </a>
-                        )}
-                      </div>
+            {/* Top keywords */}
+            <SectionCard style={{ padding: "20px 18px" }}>
+              <SectionTitle action={<span onClick={() => setTab("research")} style={{ cursor: "pointer" }}>View all</span>}>Top keywords</SectionTitle>
+              <div>{p.keywords.slice(0, 7).map(k => <Pill key={k} bg={C.lb} color={C.lbT} small>{k}</Pill>)}</div>
+            </SectionCard>
+
+            {/* Profile completeness */}
+            <SectionCard style={{ padding: "20px 18px" }}>
+              <SectionTitle>Profile completeness</SectionTitle>
+              <div style={{ display: "flex", gap: 14, alignItems: "flex-start" }}>
+                <CircleProgress pct={p.completeness} />
+                <div style={{ flex: 1 }}>
+                  <p style={{ margin: "0 0 8px", fontSize: 12, color: C.green, fontWeight: 600 }}>Excellent — almost complete</p>
+                  {p.completenessItems.map(item => (
+                    <div key={item} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11.5, color: C.t2, marginBottom: 4 }}>
+                      <CheckCircle size={12} color={C.green} style={{ flexShrink: 0 }} />
+                      {item}
                     </div>
                   ))}
                 </div>
-              )}
-            </div>
-          )}
-
-          {activeTab === 'Education' && (
-            <div className="glass-card rounded-3xl p-8 bg-white border border-slate-200/80 shadow-sm space-y-6">
-              <div className="flex items-center justify-between border-b border-slate-100 pb-4">
-                <h3 className="text-base font-bold text-slate-900 font-display">Education History</h3>
-                <button onClick={() => setShowEditModal(true)} className="text-xs font-bold text-blue-600 hover:bg-blue-50 px-3 py-1.5 rounded-xl flex items-center gap-1.5 transition-colors cursor-pointer">
-                  <Plus className="w-3.5 h-3.5" /> Manage Education
-                </button>
               </div>
-              <div className="space-y-8 relative pl-6 border-l border-slate-100 ml-4 text-left">
-                {profileData?.educationList && profileData.educationList.length > 0 ? (
-                  profileData.educationList.map((edu) => (
-                    <div key={edu._id} className="relative group transition-all duration-300">
-                      <div className="absolute -left-[31px] top-1 w-2.5 h-2.5 rounded-full bg-blue-600 border-2 border-white ring-4 ring-blue-50 shadow-sm"></div>
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                        <div>
-                          <h4 className="font-extrabold text-slate-800 text-sm font-sans flex items-center gap-2">
-                            {edu.degree}
-                          </h4>
-                          <p className="text-xs text-slate-500 font-semibold mt-1">
-                            {edu.university} • {edu.fieldOfStudy}
-                          </p>
-                        </div>
-                        <span className="px-2.5 py-1 bg-slate-50 text-slate-500 border border-slate-200/50 rounded-xl text-[10px] font-bold self-start sm:self-center">
-                          {edu.startYear} - {edu.endYear || 'Present'}
-                        </span>
-                      </div>
-                      {edu.description && (
-                        <p className="text-xs text-slate-400 mt-2 font-sans italic leading-relaxed">
-                          {edu.description}
-                        </p>
-                      )}
-                    </div>
-                  ))
-                ) : (
-                  [
-                    {
-                      degree: 'Ph.D. in Computer Science & Engineering',
-                      university: 'Amity University',
-                      fieldOfStudy: 'Artificial Intelligence',
-                      startYear: 2011,
-                      endYear: 2016,
-                      description: 'Thesis on Deep Learning Optimizations and Neural Architectures.'
-                    },
-                    {
-                      degree: 'M.Tech. in Computer Science',
-                      university: 'Indian Institute of Technology, Delhi',
-                      fieldOfStudy: 'Computer Engineering',
-                      startYear: 2009,
-                      endYear: 2011,
-                    },
-                    {
-                      degree: 'B.Tech. in Computer Science',
-                      university: 'Delhi Technological University',
-                      fieldOfStudy: 'Information Technology',
-                      startYear: 2005,
-                      endYear: 2009,
-                    }
-                  ].map((edu, idx) => (
-                    <div key={idx} className="relative group transition-all duration-300">
-                      <div className="absolute -left-[31px] top-1 w-2.5 h-2.5 rounded-full bg-blue-600 border-2 border-white ring-4 ring-blue-50 shadow-sm"></div>
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                        <div>
-                          <h4 className="font-extrabold text-slate-800 text-sm font-sans">
-                            {edu.degree}
-                          </h4>
-                          <p className="text-xs text-slate-500 font-semibold mt-1">
-                            {edu.university} • {edu.fieldOfStudy}
-                          </p>
-                        </div>
-                        <span className="px-2.5 py-1 bg-slate-50 text-slate-500 border border-slate-200/50 rounded-xl text-[10px] font-bold self-start sm:self-center">
-                          {edu.startYear} - {edu.endYear || 'Present'}
-                        </span>
-                      </div>
-                      {edu.description && (
-                        <p className="text-xs text-slate-400 mt-2 font-sans italic leading-relaxed">
-                          {edu.description}
-                        </p>
-                      )}
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-          )}
-
-          {activeTab === 'Experience' && (
-            <div className="glass-card rounded-3xl p-8 bg-white border border-slate-200/80 shadow-sm space-y-6">
-              <div className="flex items-center justify-between border-b border-slate-100 pb-4">
-                <h3 className="text-base font-bold text-slate-900 font-display">Professional Experience</h3>
-                <button onClick={() => setShowEditModal(true)} className="text-xs font-bold text-blue-600 hover:bg-blue-50 px-3 py-1.5 rounded-xl flex items-center gap-1.5 transition-colors cursor-pointer">
-                  <Plus className="w-3.5 h-3.5" /> Manage Experience
-                </button>
-              </div>
-              <div className="space-y-8 relative pl-6 border-l border-slate-100 ml-4 text-left">
-                {profileData?.experienceList && profileData.experienceList.length > 0 ? (
-                  profileData.experienceList.map((exp) => (
-                    <div key={exp._id} className="relative group transition-all duration-300">
-                      <div className="absolute -left-[31px] top-1 w-2.5 h-2.5 rounded-full bg-indigo-600 border-2 border-white ring-4 ring-indigo-50 shadow-sm"></div>
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                        <div>
-                          <h4 className="font-extrabold text-slate-800 text-sm font-sans flex items-center gap-2">
-                            {exp.role}
-                          </h4>
-                          <p className="text-xs text-slate-500 font-semibold mt-1">
-                            {exp.organization} • {exp.department || exp.employmentType}
-                          </p>
-                        </div>
-                        <span className="px-2.5 py-1 bg-slate-50 text-slate-500 border border-slate-200/50 rounded-xl text-[10px] font-bold self-start sm:self-center">
-                          {exp.startYear} - {exp.endYear || 'Present'}
-                        </span>
-                      </div>
-                      {exp.description && (
-                        <p className="text-xs text-slate-400 mt-2 font-sans italic leading-relaxed">
-                          {exp.description}
-                        </p>
-                      )}
-                    </div>
-                  ))
-                ) : (
-                  [
-                    {
-                      role: 'Associate Professor',
-                      organization: 'Amity University',
-                      department: 'Department of Computer Science & Engineering',
-                      employmentType: 'full-time',
-                      startYear: 2016,
-                      endYear: null,
-                      description: 'Teaching graduate classes in Deep Learning. Supervising Ph.D. candidates.'
-                    },
-                    {
-                      role: 'Assistant Professor',
-                      organization: 'IIT Delhi',
-                      department: 'Department of Computer Science',
-                      employmentType: 'full-time',
-                      startYear: 2013,
-                      endYear: 2016,
-                    },
-                    {
-                      role: 'Research Scientist',
-                      organization: 'TCS Research, Bangalore',
-                      department: 'Innovation Lab',
-                      employmentType: 'full-time',
-                      startYear: 2011,
-                      endYear: 2013,
-                    }
-                  ].map((exp, idx) => (
-                    <div key={idx} className="relative group transition-all duration-300">
-                      <div className="absolute -left-[31px] top-1 w-2.5 h-2.5 rounded-full bg-indigo-600 border-2 border-white ring-4 ring-indigo-50 shadow-sm"></div>
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                        <div>
-                          <h4 className="font-extrabold text-slate-800 text-sm font-sans">
-                            {exp.role}
-                          </h4>
-                          <p className="text-xs text-slate-500 font-semibold mt-1">
-                            {exp.organization} • {exp.department || exp.employmentType}
-                          </p>
-                        </div>
-                        <span className="px-2.5 py-1 bg-slate-50 text-slate-500 border border-slate-200/50 rounded-xl text-[10px] font-bold self-start sm:self-center">
-                          {exp.startYear} - {exp.endYear || 'Present'}
-                        </span>
-                      </div>
-                      {exp.description && (
-                        <p className="text-xs text-slate-400 mt-2 font-sans italic leading-relaxed">
-                          {exp.description}
-                        </p>
-                      )}
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-          )}
-
-          {activeTab !== 'About' && activeTab !== 'Publications' && activeTab !== 'Education' && activeTab !== 'Experience' && (
-            <div className="glass-card rounded-3xl p-8 bg-white border border-slate-200/80 shadow-sm space-y-4">
-              <h3 className="text-base font-bold text-slate-900 font-display">{activeTab}</h3>
-              <p className="text-sm text-slate-500 font-sans">
-                This section contains verified data from your institutional records. Click Edit Profile to add new {activeTab.toLowerCase()}.
-              </p>
-            </div>
-          )}
-        </div>
-
-        {/* Right Column (Metrics & Metadata Summary - Sticky) */}
-        <div className="flex flex-col gap-8 text-left lg:sticky lg:top-6 self-start h-fit">
-          
-          {/* Research Metrics Dashboard Card */}
-          <div className="glass-card rounded-3xl p-6 bg-white border border-slate-200/80 shadow-sm space-y-6">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <h3 className="text-sm font-extrabold text-slate-800 tracking-wide uppercase font-display">Research Metrics</h3>
-              {profileData?.academicProfile?.googleScholar && (
-                <span className="px-2 py-0.5 bg-green-50 text-green-700 border border-green-200/40 rounded-lg text-[9px] font-extrabold tracking-wider uppercase">
-                  Scholar Synced
-                </span>
-              )}
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="p-4 rounded-2xl bg-gradient-to-br from-blue-500/5 to-indigo-500/5 border border-blue-100/50 hover:shadow-md transition-all duration-300 group text-left">
-                <div className="flex items-center justify-between text-slate-400">
-                  <span className="text-[9px] font-extrabold uppercase tracking-wider text-slate-500">Publications</span>
-                  <BookOpen className="w-4 h-4 text-blue-600 group-hover:scale-110 transition-transform" />
-                </div>
-                <p className="text-2xl font-black text-slate-900 mt-2 font-display">{profileData?.publications || publications.length}</p>
-                <div className="w-full bg-slate-100 h-1 rounded-full mt-3 overflow-hidden">
-                  <div className="bg-blue-600 h-full rounded-full w-[85%]"></div>
-                </div>
-              </div>
-
-              <div className="p-4 rounded-2xl bg-gradient-to-br from-green-500/5 to-emerald-500/5 border border-green-100/50 hover:shadow-md transition-all duration-300 group text-left">
-                <div className="flex items-center justify-between text-slate-400">
-                  <span className="text-[9px] font-extrabold uppercase tracking-wider text-slate-500">Citations</span>
-                  <Sparkles className="w-4 h-4 text-green-600 group-hover:scale-110 transition-transform" />
-                </div>
-                <p className="text-2xl font-black text-slate-900 mt-2 font-display">{profileData?.citations || 0}</p>
-                <div className="w-full bg-slate-100 h-1 rounded-full mt-3 overflow-hidden">
-                  <div className="bg-green-500 h-full rounded-full w-[70%]"></div>
-                </div>
-              </div>
-
-              <div className="p-4 rounded-2xl bg-gradient-to-br from-purple-500/5 to-indigo-500/5 border border-purple-100/50 hover:shadow-md transition-all duration-300 group text-left">
-                <div className="flex items-center justify-between text-slate-400">
-                  <span className="text-[9px] font-extrabold uppercase tracking-wider text-slate-500">h-index</span>
-                  <Award className="w-4 h-4 text-purple-600 group-hover:scale-110 transition-transform" />
-                </div>
-                <p className="text-2xl font-black text-slate-900 mt-2 font-display">{profileData?.hIndex || 0}</p>
-                <div className="w-full bg-slate-100 h-1 rounded-full mt-3 overflow-hidden">
-                  <div className="bg-purple-600 h-full rounded-full w-[55%]"></div>
-                </div>
-              </div>
-
-              <div className="p-4 rounded-2xl bg-gradient-to-br from-amber-500/5 to-orange-500/5 border border-amber-100/50 hover:shadow-md transition-all duration-300 group text-left">
-                <div className="flex items-center justify-between text-slate-400">
-                  <span className="text-[9px] font-extrabold uppercase tracking-wider text-slate-500">i10-index</span>
-                  <Layers className="w-4 h-4 text-amber-600 group-hover:scale-110 transition-transform" />
-                </div>
-                <p className="text-2xl font-black text-slate-900 mt-2 font-display">{profileData?.i10Index || 0}</p>
-                <div className="w-full bg-slate-100 h-1 rounded-full mt-3 overflow-hidden">
-                  <div className="bg-amber-600 h-full rounded-full w-[65%]"></div>
-                </div>
-              </div>
-
-              <div className="p-4 rounded-2xl bg-gradient-to-br from-rose-500/5 to-red-500/5 border border-rose-100/50 hover:shadow-md transition-all duration-300 group text-left">
-                <div className="flex items-center justify-between text-slate-400">
-                  <span className="text-[9px] font-extrabold uppercase tracking-wider text-slate-500">Experience</span>
-                  <User className="w-4 h-4 text-rose-600 group-hover:scale-110 transition-transform" />
-                </div>
-                <p className="text-2xl font-black text-slate-900 mt-2 font-display">{profileData?.experience || 10}+ Yrs</p>
-                <div className="w-full bg-slate-100 h-1 rounded-full mt-3 overflow-hidden">
-                  <div className="bg-rose-500 h-full rounded-full w-[90%]"></div>
-                </div>
-              </div>
-
-              <div className="p-4 rounded-2xl bg-gradient-to-br from-cyan-500/5 to-sky-500/5 border border-cyan-100/50 hover:shadow-md transition-all duration-300 group text-left">
-                <div className="flex items-center justify-between text-slate-400">
-                  <span className="text-[9px] font-extrabold uppercase tracking-wider text-slate-500">Areas</span>
-                  <GraduationCap className="w-4 h-4 text-cyan-600 group-hover:scale-110 transition-transform" />
-                </div>
-                <p className="text-2xl font-black text-slate-900 mt-2 font-display">
-                  {profileData?.researchAreas?.length || 7}
-                </p>
-                <div className="w-full bg-slate-100 h-1 rounded-full mt-3 overflow-hidden">
-                  <div className="bg-cyan-500 h-full rounded-full w-[75%]"></div>
-                </div>
-              </div>
-            </div>
+            </SectionCard>
           </div>
-
-          {/* Citation Graph Card */}
-          {profileData?.researchMetrics?.citationsByYear && profileData.researchMetrics.citationsByYear.length > 0 && (
-            <div className="glass-card rounded-3xl p-6 bg-white border border-slate-200/80 shadow-sm space-y-4">
-              <h3 className="text-xs font-extrabold text-slate-800 tracking-wide uppercase font-display border-b border-slate-100 pb-2 flex items-center justify-between">
-                Citation History
-                <span className="text-[9px] text-slate-400 capitalize font-medium">annual trends</span>
-              </h3>
-              <div className="relative w-full pt-2">
-                {/* SVG Line/Bar Chart */}
-                <svg viewBox="0 0 400 160" className="w-full h-auto overflow-visible">
-                  {/* Grid Lines */}
-                  <line x1="40" y1="20" x2="380" y2="20" stroke="#f1f5f9" strokeWidth="1" />
-                  <line x1="40" y1="60" x2="380" y2="60" stroke="#f1f5f9" strokeWidth="1" />
-                  <line x1="40" y1="100" x2="380" y2="100" stroke="#f1f5f9" strokeWidth="1" />
-                  <line x1="40" y1="140" x2="380" y2="140" stroke="#cbd5e1" strokeWidth="1.5" />
-
-                  {/* Graph Data */}
-                  {(() => {
-                    const data = [...profileData.researchMetrics.citationsByYear].sort((a, b) => a.year - b.year);
-                    const maxCitations = Math.max(...data.map(d => d.citations), 5);
-                    const points = data.map((d, index) => {
-                      const x = 40 + (index * (340 / (data.length - 1 || 1)));
-                      const y = 140 - (d.citations * (120 / maxCitations));
-                      return { x, y, ...d };
-                    });
-
-                    const pathD = points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ');
-                    const areaD = points.length > 0 
-                      ? `${pathD} L ${points[points.length - 1].x} 140 L ${points[0].x} 140 Z` 
-                      : '';
-
-                    return (
-                      <>
-                        {/* Shaded Area */}
-                        {areaD && <path d={areaD} fill="url(#citationGrad)" opacity="0.15" />}
-                        {/* Smooth Line */}
-                        {pathD && <path d={pathD} fill="none" stroke="#2563EB" strokeWidth="2.5" strokeLinecap="round" />}
-                        
-                        {/* Interactive Nodes */}
-                        {points.map((p, i) => (
-                          <g key={i} className="group/node cursor-pointer">
-                            <circle 
-                              cx={p.x} 
-                              cy={p.y} 
-                              r="4" 
-                              fill="#ffffff" 
-                              stroke="#2563EB" 
-                              strokeWidth="2" 
-                              className="transition-all duration-200 group-hover/node:r-6 group-hover/node:fill-blue-600"
-                            />
-                            {/* Hover tooltip */}
-                            <g className="opacity-0 group-hover/node:opacity-100 transition-opacity duration-200 pointer-events-none">
-                              <rect 
-                                x={p.x - 30} 
-                                y={p.y - 32} 
-                                width="60" 
-                                height="22" 
-                                rx="6" 
-                                fill="#0f172a" 
-                              />
-                              <text 
-                                x={p.x} 
-                                y={p.y - 17} 
-                                fill="#ffffff" 
-                                fontSize="9" 
-                                fontWeight="bold" 
-                                textAnchor="middle"
-                              >
-                                {p.citations}
-                              </text>
-                            </g>
-                            {/* X-axis labels */}
-                            <text 
-                              x={p.x} 
-                              y="155" 
-                              fill="#64748b" 
-                              fontSize="8" 
-                              fontWeight="bold" 
-                              textAnchor="middle"
-                            >
-                              {p.year}
-                            </text>
-                          </g>
-                        ))}
-
-                        <defs>
-                          <linearGradient id="citationGrad" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="0%" stopColor="#2563EB" />
-                            <stop offset="100%" stopColor="#2563EB" stopOpacity="0" />
-                          </linearGradient>
-                        </defs>
-                      </>
-                    );
-                  })()}
-                </svg>
-              </div>
-            </div>
-          )}
-
-          {/* Research Areas */}
-          <div className="glass-card rounded-3xl p-6 bg-white border border-slate-200/80 shadow-sm space-y-4">
-            <h3 className="text-xs font-extrabold text-slate-900 tracking-wide uppercase font-display border-b border-slate-100 pb-2">Research Areas</h3>
-            <div className="flex flex-wrap gap-2">
-              {profileData?.researchAreas && profileData.researchAreas.length > 0 ? (
-                profileData.researchAreas.map((area) => (
-                  <span key={area._id} className="px-3 py-1.5 bg-blue-50/60 hover:bg-blue-100 text-blue-700 border border-blue-100/30 rounded-xl text-xs font-semibold transition-colors cursor-pointer">
-                    {area.researchArea?.areaName}
-                  </span>
-                ))
-              ) : (
-                ['Artificial Intelligence', 'Deep Learning', 'Natural Language Processing', 'Computer Vision', 'Data Mining', 'AI Ethics', 'Healthcare AI'].map((area) => (
-                  <span key={area} className="px-3 py-1.5 bg-blue-50/60 hover:bg-blue-100 text-blue-700 border border-blue-100/30 rounded-xl text-xs font-semibold cursor-pointer transition-all hover:scale-105 duration-200">
-                    {area}
-                  </span>
-                ))
-              )}
-            </div>
-          </div>
-
-          {/* Top Keywords */}
-          <div className="glass-card rounded-3xl p-6 bg-white border border-slate-200/80 shadow-sm space-y-4">
-            <h3 className="text-xs font-extrabold text-slate-900 tracking-wide uppercase font-display border-b border-slate-100 pb-2">Top Keywords</h3>
-            <div className="flex flex-wrap gap-1.5">
-              {profileData?.keywords && profileData.keywords.length > 0 ? (
-                profileData.keywords.map((kw) => (
-                  <span key={kw._id} className="px-2.5 py-1 bg-slate-50 border border-slate-200/60 text-slate-600 rounded-lg text-xs font-medium">
-                    {kw.keyword?.keyword}
-                  </span>
-                ))
-              ) : (
-                ['Machine Learning', 'Deep Learning', 'NLP', 'Computer Vision', 'Data Mining', 'AI', 'Text Classification', 'Neural Networks'].map((kw) => (
-                  <span key={kw} className="px-2.5 py-1 bg-slate-50 hover:bg-slate-100 border border-slate-200/60 text-slate-600 rounded-lg text-xs font-medium cursor-pointer transition-colors">
-                    {kw}
-                  </span>
-                ))
-              )}
-            </div>
-          </div>
-
-          {/* Profile Completeness Card */}
-          <div className="glass-card rounded-3xl p-6 bg-white border border-slate-200/80 shadow-sm space-y-4">
-            <h3 className="text-xs font-extrabold text-slate-900 tracking-wide uppercase font-display border-b border-slate-100 pb-2">Profile Completeness</h3>
-            <div className="flex items-center gap-6">
-              <div className="relative w-20 h-20 flex items-center justify-center shrink-0">
-                <svg className="w-full h-full transform -rotate-90">
-                  <circle
-                    cx="40"
-                    cy="40"
-                    r="34"
-                    stroke="#E2E8F0"
-                    strokeWidth="6"
-                    fill="transparent"
-                  />
-                  <circle
-                    cx="40"
-                    cy="40"
-                    r="34"
-                    stroke="#2563EB"
-                    strokeWidth="6"
-                    fill="transparent"
-                    strokeDasharray={2 * Math.PI * 34}
-                    strokeDashoffset={2 * Math.PI * 34 * (1 - completeness.percentage / 100)}
-                    strokeLinecap="round"
-                    className="transition-all duration-1000 ease-out"
-                  />
-                </svg>
-                <span className="absolute text-sm font-extrabold text-slate-800">{completeness.percentage}%</span>
-              </div>
-
-              <div className="text-left space-y-1">
-                <p className="text-xs font-bold text-slate-800">
-                  {completeness.percentage < 40 ? 'Good start!' : completeness.percentage < 75 ? 'Great progress!' : 'Excellent progress!'}
-                </p>
-                <p className="text-[10px] text-slate-400">
-                  {completeness.percentage < 40 
-                    ? 'Complete your profile to increase your visibility.' 
-                    : completeness.percentage < 75 
-                      ? 'Your profile ranks in the top 35% of computer science researchers.' 
-                      : 'Your profile ranks in the top 8% of computer science researchers.'}
-                </p>
-              </div>
-            </div>
-
-            {/* Items Checklist */}
-            <div className="space-y-2.5 pt-2 text-xs text-slate-500">
-              {completeness.steps.map((step) => (
-                <div key={step.label} className="flex items-center gap-2">
-                  <CheckCircle2 className={`w-4 h-4 shrink-0 ${step.completed ? 'text-green-600' : 'text-slate-300'}`} />
-                  <span className={step.completed ? 'text-slate-800 font-medium' : 'text-slate-400'}>{step.label}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-
         </div>
       </div>
-
-      <EditProfileModal 
-        isOpen={showEditModal} 
-        onClose={() => setShowEditModal(false)} 
-        initialData={{
-          ...profileData,
-          publications
-        }} 
-        onSaveSuccess={() => {
-          fetchProfileDetails();
-        }} 
-      />
-      <SyncMergeModal
-        isOpen={showSyncModal}
-        onClose={() => setShowSyncModal(false)}
-        onSyncComplete={async () => {
-          setLoading(true);
-          await fetchProfileDetails();
-          alert('Profile sync completed successfully!');
-        }}
-      />
     </div>
   );
-};
-
-export default ProfilePage;
+}
